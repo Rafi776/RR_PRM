@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useActionState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useActionState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { signInWithPassword, type AuthActionState } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
 const initialState: AuthActionState = { error: null };
 
 function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
   const blocked = searchParams.get("blocked") === "1";
@@ -26,9 +27,12 @@ function LoginForm() {
     initialState,
   );
 
+  useEffect(() => {
+    if (state.success) router.replace(redirectTo);
+  }, [state.success, router, redirectTo]);
+
   return (
     <form action={formAction} className="space-y-4">
-      <input type="hidden" name="redirectTo" value={redirectTo} />
       {blocked ? (
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
           Your membership has been cancelled. Contact an admin if you believe

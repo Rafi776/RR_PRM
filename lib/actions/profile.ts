@@ -1,8 +1,6 @@
-"use server";
-
-import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/data/session";
+import { createClient } from "@/lib/supabase/client";
+import { fetchCurrentUser } from "@/lib/hooks/use-current-user";
+import { queryClient } from "@/lib/query-client";
 import type { ActionResult } from "@/lib/actions/teams";
 
 // Self-service only: a member may update their own phone and photo.
@@ -15,7 +13,7 @@ export async function uploadProfilePhoto(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
   const file = formData.get("file");
@@ -29,7 +27,7 @@ export async function uploadProfilePhoto(
     return { error: "Image must be under 5MB." };
   }
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const path = `${user.id}/${Date.now()}-${file.name}`;
 
   const { error: uploadError } = await supabase.storage
@@ -47,9 +45,7 @@ export async function uploadProfilePhoto(
     .eq("id", user.id);
   if (updateError) return { error: updateError.message };
 
-  revalidatePath("/profile");
-  revalidatePath("/members");
-  revalidatePath("/dashboard");
+  queryClient.invalidateQueries();
   return { error: null, success: "Profile photo updated." };
 }
 
@@ -64,13 +60,13 @@ export async function setMemberPhoto(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
   const memberId = String(formData.get("memberId") ?? "");
   if (!memberId) return { error: "Missing member." };
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const file = formData.get("file");
   const url = String(formData.get("photoUrl") ?? "").trim();
 
@@ -111,9 +107,7 @@ export async function setMemberPhoto(
     .eq("id", memberId);
   if (updateError) return { error: updateError.message };
 
-  revalidatePath("/members");
-  revalidatePath("/profile");
-  revalidatePath("/dashboard");
+  queryClient.invalidateQueries();
   return { error: null, success: "Photo updated." };
 }
 
@@ -121,18 +115,18 @@ export async function updateOwnPhone(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
   const phone = String(formData.get("phone") ?? "").trim();
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { error } = await supabase
     .from("prm_members")
     .update({ phone: phone || null })
     .eq("id", user.id);
   if (error) return { error: error.message };
 
-  revalidatePath("/profile");
+  queryClient.invalidateQueries();
   return { error: null, success: "Phone number updated." };
 }

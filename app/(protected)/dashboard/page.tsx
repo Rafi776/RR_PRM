@@ -1,9 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { Trophy, ListChecks, FileCheck2, ArrowRight } from "lucide-react";
-import { getCurrentUser } from "@/lib/data/session";
-import { getGlobalLeaderboard } from "@/lib/data/leaderboard";
-import { listTasksForUser } from "@/lib/data/tasks";
-import { getOwnNocs } from "@/lib/data/noc";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useGlobalLeaderboard } from "@/lib/data/leaderboard";
+import { useTasksForUser } from "@/lib/data/tasks";
+import { useOwnNocs } from "@/lib/data/noc";
 import {
   Card,
   CardContent,
@@ -13,15 +15,12 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-export default async function DashboardPage() {
-  const user = await getCurrentUser();
+export default function DashboardPage() {
+  const { data: user } = useCurrentUser();
+  const { data: leaderboard = [] } = useGlobalLeaderboard();
+  const { data: tasks = [] } = useTasksForUser(user?.id);
+  const { data: nocs = [] } = useOwnNocs(user?.id);
   if (!user) return null;
-
-  const [leaderboard, tasks, nocs] = await Promise.all([
-    getGlobalLeaderboard(),
-    listTasksForUser(user.id),
-    getOwnNocs(user.id),
-  ]);
 
   const myRank = leaderboard.find((r) => r.member_id === user.id);
   const pendingTasks = tasks.filter((t) => t.my_status === "not_submitted" || t.my_status === null);

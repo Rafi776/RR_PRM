@@ -1,5 +1,7 @@
-import "server-only";
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 import type { MemberStatus } from "@/lib/types/domain";
 
 export type MemberDirectoryRow = {
@@ -36,7 +38,7 @@ function sanitizeForFilter(value: string) {
 export async function listMembersDirectory(
   filters: MemberDirectoryFilters,
 ): Promise<MemberDirectoryRow[]> {
-  const supabase = await createClient();
+  const supabase = createClient();
   let query = supabase
     .from("prm_members")
     .select(
@@ -61,7 +63,7 @@ export async function listMembersDirectory(
 }
 
 export async function getOwnProfile(memberId: string): Promise<MemberDirectoryRow | null> {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("prm_members")
     .select(
@@ -80,7 +82,7 @@ export type MemberDirectoryFilterOptions = {
 };
 
 export async function getMemberDirectoryFilterOptions(): Promise<MemberDirectoryFilterOptions> {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("prm_members")
     .select("team_name, stage, district");
@@ -94,4 +96,29 @@ export async function getMemberDirectoryFilterOptions(): Promise<MemberDirectory
     stages: dedupe((data ?? []).map((r) => r.stage)),
     districts: dedupe((data ?? []).map((r) => r.district)),
   };
+}
+
+// ---------------------------------------------------------------------
+// react-query hooks
+// ---------------------------------------------------------------------
+export function useMembersDirectory(filters: MemberDirectoryFilters) {
+  return useQuery({
+    queryKey: ["members-directory", filters],
+    queryFn: () => listMembersDirectory(filters),
+  });
+}
+
+export function useOwnProfile(memberId: string | undefined) {
+  return useQuery({
+    queryKey: ["own-profile", memberId],
+    queryFn: () => getOwnProfile(memberId!),
+    enabled: !!memberId,
+  });
+}
+
+export function useMemberDirectoryFilterOptions() {
+  return useQuery({
+    queryKey: ["member-directory-filter-options"],
+    queryFn: getMemberDirectoryFilterOptions,
+  });
 }

@@ -1,5 +1,7 @@
-import "server-only";
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 import type { RoleName } from "@/lib/types/domain";
 
 export type CurrentUser = {
@@ -10,15 +12,12 @@ export type CurrentUser = {
   roles: RoleName[];
   isSuperAdmin: boolean;
   isCoreTeam: boolean;
-  // team_id -> { coordinator, deputy }
   leadershipTeamIds: string[];
+  blockedAt: string | null;
 };
 
-// Central place every protected page/action pulls identity + role
-// context from. Keeping this in one spot avoids re-deriving RBAC logic
-// per page.
-export async function getCurrentUser(): Promise<CurrentUser | null> {
-  const supabase = await createClient();
+export async function fetchCurrentUser(): Promise<CurrentUser | null> {
+  const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -29,13 +28,10 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     await Promise.all([
       supabase
         .from("prm_members")
-        .select("id, full_name, email, photo")
+        .select("id, full_name, email, photo, blocked_at")
         .eq("id", user.id)
         .maybeSingle(),
-      supabase
-        .from("user_roles")
-        .select("roles(name)")
-        .eq("member_id", user.id),
+      supabase.from("user_roles").select("roles(name)").eq("member_id", user.id),
       supabase
         .from("team_memberships")
         .select("team_id")
@@ -59,8 +55,15 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     roles,
     isSuperAdmin: roles.includes("Super Admin"),
     isCoreTeam: roles.includes("Core Team") || roles.includes("Super Admin"),
-    leadershipTeamIds: (leadershipRows ?? []).map(
-      (r: { team_id: string }) => r.team_id,
-    ),
+    leadershipTeamIds: (leadershipRows ?? []).map((r: { team_id: string }) => r.team_id),
+    blockedAt: member?.blocked_at ?? null,
   };
+}
+
+export function useCurrentUser() {
+  return useQuery({
+    queryKey: ["current-user"],
+    queryFn: fetchCurrentUser,
+    staleTime: 30_000,
+  });
 }

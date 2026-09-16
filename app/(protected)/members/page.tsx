@@ -1,8 +1,12 @@
-import { getCurrentUser } from "@/lib/data/session";
-import { getOrganogramData } from "@/lib/data/teams";
+"use client";
+
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useOrganogram } from "@/lib/data/teams";
 import {
-  listMembersDirectory,
-  getMemberDirectoryFilterOptions,
+  useMembersDirectory,
+  useMemberDirectoryFilterOptions,
 } from "@/lib/data/members";
 import {
   Card,
@@ -15,20 +19,22 @@ import { Organogram } from "@/components/members/organogram";
 import { MemberFilters } from "@/components/members/member-filters";
 import { MemberDirectoryTable } from "@/components/members/member-directory-table";
 
-export default async function MembersPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string; team?: string; stage?: string; district?: string; status?: string }>;
-}) {
-  const user = await getCurrentUser();
-  if (!user) return null;
+function MembersPageInner() {
+  const { data: user } = useCurrentUser();
+  const searchParams = useSearchParams();
+  const filters = {
+    q: searchParams.get("q") ?? undefined,
+    team: searchParams.get("team") ?? undefined,
+    stage: searchParams.get("stage") ?? undefined,
+    district: searchParams.get("district") ?? undefined,
+    status: searchParams.get("status") ?? undefined,
+  };
 
-  const params = await searchParams;
-  const [organogram, filterOptions, members] = await Promise.all([
-    getOrganogramData(),
-    getMemberDirectoryFilterOptions(),
-    listMembersDirectory(params),
-  ]);
+  const { data: organogram } = useOrganogram();
+  const { data: filterOptions } = useMemberDirectoryFilterOptions();
+  const { data: members = [] } = useMembersDirectory(filters);
+
+  if (!user || !organogram || !filterOptions) return null;
 
   const canManage = user.isSuperAdmin || user.leadershipTeamIds.length > 0;
 
@@ -74,5 +80,13 @@ export default async function MembersPage({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function MembersPage() {
+  return (
+    <Suspense fallback={null}>
+      <MembersPageInner />
+    </Suspense>
   );
 }

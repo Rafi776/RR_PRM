@@ -1,5 +1,7 @@
-import "server-only";
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 
 export type ReportStatus = "open" | "reviewed" | "dismissed";
 
@@ -21,7 +23,7 @@ export type MemberReportRow = {
 // they're the reporter; a Super Admin's returns everything. Same query
 // for both — visibility is enforced at the database, not here.
 export async function listVisibleReports(): Promise<MemberReportRow[]> {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("member_reports")
     .select(
@@ -48,4 +50,11 @@ export async function listVisibleReports(): Promise<MemberReportRow[]> {
     created_at: row.created_at,
     reviewed_at: row.reviewed_at,
   }));
+}
+
+// ---------------------------------------------------------------------
+// react-query hooks
+// ---------------------------------------------------------------------
+export function useVisibleReports() {
+  return useQuery({ queryKey: ["visible-reports"], queryFn: listVisibleReports });
 }

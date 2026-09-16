@@ -1,5 +1,7 @@
-import "server-only";
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 import type { TaskStatus } from "@/lib/types/domain";
 
 export type TaskListRow = {
@@ -13,7 +15,7 @@ export type TaskListRow = {
 };
 
 export async function listTasksForUser(memberId: string): Promise<TaskListRow[]> {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("team_tasks")
     .select(
@@ -44,7 +46,7 @@ export async function listTasksForUser(memberId: string): Promise<TaskListRow[]>
 }
 
 export async function getTaskTypes() {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("task_types")
     .select("id, name, default_points")
@@ -54,7 +56,7 @@ export async function getTaskTypes() {
 }
 
 export async function getTaskDetail(taskId: string) {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data: task, error } = await supabase
     .from("team_tasks")
     .select("id, title, description, points, due_date, team_id, teams(name)")
@@ -115,10 +117,33 @@ export async function getTaskDetail(taskId: string) {
 }
 
 export async function getSignedTaskAttachmentUrl(filePath: string) {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase.storage
     .from("task-attachments")
     .createSignedUrl(filePath, 300);
   if (error) return null;
   return data.signedUrl;
+}
+
+// ---------------------------------------------------------------------
+// react-query hooks
+// ---------------------------------------------------------------------
+export function useTasksForUser(memberId: string | undefined) {
+  return useQuery({
+    queryKey: ["tasks-for-user", memberId],
+    queryFn: () => listTasksForUser(memberId!),
+    enabled: !!memberId,
+  });
+}
+
+export function useTaskTypes() {
+  return useQuery({ queryKey: ["task-types"], queryFn: getTaskTypes });
+}
+
+export function useTaskDetail(taskId: string | undefined) {
+  return useQuery({
+    queryKey: ["task-detail", taskId],
+    queryFn: () => getTaskDetail(taskId!),
+    enabled: !!taskId,
+  });
 }

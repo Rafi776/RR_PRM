@@ -1,7 +1,9 @@
+"use client";
+
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/data/session";
-import { listMeetings } from "@/lib/data/meetings";
-import { listTeams } from "@/lib/data/teams";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useMeetings } from "@/lib/data/meetings";
+import { useTeams } from "@/lib/data/teams";
 import {
   Card,
   CardContent,
@@ -20,12 +22,13 @@ import {
 } from "@/components/ui/table";
 import { CreateMeetingDialog } from "@/components/meetings/create-meeting-dialog";
 
-export default async function MeetingsPage() {
-  const user = await getCurrentUser();
+export default function MeetingsPage() {
+  const { data: user } = useCurrentUser();
+  const { data: meetings = [] } = useMeetings();
+  const { data: teams = [] } = useTeams();
   if (!user) return null;
 
   const canLog = user.isSuperAdmin || user.isCoreTeam || user.leadershipTeamIds.length > 0;
-  const [meetings, teams] = await Promise.all([listMeetings(), listTeams()]);
 
   const manageableTeams = user.isSuperAdmin
     ? teams.filter((t) => !t.is_core_team)
@@ -56,7 +59,7 @@ export default async function MeetingsPage() {
               {/* Mobile: card list */}
               <div className="divide-y rounded-lg border sm:hidden">
                 {meetings.map((m) => (
-                  <Link key={m.id} href={`/meetings/${m.id}`} className="block p-3 active:bg-muted">
+                  <Link key={m.id} href={`/meetings/detail?id=${m.id}`} className="block p-3 active:bg-muted">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium text-primary">{m.title}</p>
                       {m.scope === "central_core" ? (
@@ -86,7 +89,7 @@ export default async function MeetingsPage() {
                     {meetings.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>
-                          <Link href={`/meetings/${m.id}`} className="font-medium text-primary hover:underline">
+                          <Link href={`/meetings/detail?id=${m.id}`} className="font-medium text-primary hover:underline">
                             {m.title}
                           </Link>
                         </TableCell>

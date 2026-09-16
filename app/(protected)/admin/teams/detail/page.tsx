@@ -1,6 +1,9 @@
-import { redirect, notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/data/session";
-import { getTeam, getTeamMembers, listAllMembers } from "@/lib/data/teams";
+"use client";
+
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useTeam, useTeamMembers, useAllMembers } from "@/lib/data/teams";
 import {
   Card,
   CardContent,
@@ -21,24 +24,16 @@ import { LeadershipSelect } from "@/components/admin/leadership-select";
 import { AddMemberForm } from "@/components/admin/add-member-form";
 import { EditMemberDialog } from "@/components/admin/edit-member-dialog";
 
-export default async function TeamDetailPage({
-  params,
-}: {
-  params: Promise<{ teamId: string }>;
-}) {
-  const { teamId } = await params;
-  const user = await getCurrentUser();
-  if (!user?.isSuperAdmin && !user?.leadershipTeamIds.includes(teamId)) {
-    redirect("/dashboard");
-  }
+function TeamDetailInner() {
+  const teamId = useSearchParams().get("id") ?? "";
+  const { data: user } = useCurrentUser();
+  const { data: team } = useTeam(teamId);
+  const { data: members = [] } = useTeamMembers(teamId);
+  const { data: allMembers = [] } = useAllMembers();
 
-  const team = await getTeam(teamId).catch(() => null);
-  if (!team) notFound();
-
-  const [members, allMembers] = await Promise.all([
-    getTeamMembers(teamId),
-    listAllMembers(),
-  ]);
+  if (!user || !teamId) return null;
+  if (!user.isSuperAdmin && !user.leadershipTeamIds.includes(teamId)) return null;
+  if (!team) return <p className="p-8 text-sm text-muted-foreground">Loading…</p>;
 
   const memberOptions = members.map((m) => ({ id: m.member_id, full_name: m.full_name }));
   const candidates = allMembers.filter(
@@ -165,5 +160,13 @@ export default async function TeamDetailPage({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function TeamDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <TeamDetailInner />
+    </Suspense>
   );
 }

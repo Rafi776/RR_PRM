@@ -1,17 +1,15 @@
-import { redirect } from "next/navigation";
+"use client";
+
 import { Sparkles } from "lucide-react";
-import { getCurrentUser } from "@/lib/data/session";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { SidebarNav } from "@/components/nav/sidebar-nav";
 import { MobileNav } from "@/components/nav/mobile-nav";
 import { UserMenu } from "@/components/nav/user-menu";
 
-export default async function ProtectedLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+function ProtectedShell({ children }: { children: React.ReactNode }) {
+  const { data: user } = useCurrentUser();
+  if (!user) return null;
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
@@ -47,5 +45,17 @@ export default async function ProtectedLayout({
         <main className="flex-1 bg-background">{children}</main>
       </div>
     </div>
+  );
+}
+
+export default function ProtectedLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <AuthGuard>
+      <ProtectedShell>{children}</ProtectedShell>
+    </AuthGuard>
   );
 }

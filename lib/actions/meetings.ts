@@ -1,16 +1,15 @@
-"use server";
-
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/data/session";
+import { createClient } from "@/lib/supabase/client";
+import { fetchCurrentUser } from "@/lib/hooks/use-current-user";
+import { queryClient } from "@/lib/query-client";
 import type { ActionResult } from "@/lib/actions/teams";
 
+export type CreateMeetingResult = ActionResult & { meetingId?: string };
+
 export async function createMeeting(
-  _prev: ActionResult,
+  _prev: CreateMeetingResult,
   formData: FormData,
-): Promise<ActionResult> {
-  const user = await getCurrentUser();
+): Promise<CreateMeetingResult> {
+  const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
   const scope = String(formData.get("scope") ?? "team") as "central_core" | "team";
@@ -29,7 +28,7 @@ export async function createMeeting(
     return { error: "Not authorized for this team." };
   }
 
-  const supabase = await createClient();
+  const supabase = createClient();
 
   const { data: created, error } = await supabase
     .from("team_meeting_minutes")
@@ -61,15 +60,15 @@ export async function createMeeting(
     }
   }
 
-  revalidatePath("/meetings");
-  redirect(`/meetings/${created.id}`);
+  queryClient.invalidateQueries();
+  return { error: null, meetingId: created.id };
 }
 
 export async function saveAttendance(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
   const meetingId = String(formData.get("meetingId") ?? "");
@@ -82,12 +81,12 @@ export async function saveAttendance(
     status: String(formData.get(`status_${memberId}`) ?? "absent"),
   }));
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { error } = await supabase
     .from("meeting_attendance")
     .upsert(rows, { onConflict: "meeting_id,member_id" });
   if (error) return { error: error.message };
 
-  revalidatePath(`/meetings/${meetingId}`);
+  queryClient.invalidateQueries();
   return { error: null, success: "Attendance saved." };
 }

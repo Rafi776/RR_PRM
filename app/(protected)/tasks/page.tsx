@@ -1,7 +1,9 @@
+"use client";
+
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/data/session";
-import { listTasksForUser, getTaskTypes } from "@/lib/data/tasks";
-import { listTeams } from "@/lib/data/teams";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useTasksForUser, useTaskTypes } from "@/lib/data/tasks";
+import { useTeams } from "@/lib/data/teams";
 import {
   Card,
   CardContent,
@@ -35,16 +37,14 @@ function statusBadge(status: TaskStatus | null) {
   return <Badge variant={variant}>{status.replace("_", " ")}</Badge>;
 }
 
-export default async function TasksPage() {
-  const user = await getCurrentUser();
+export default function TasksPage() {
+  const { data: user } = useCurrentUser();
+  const { data: tasks = [] } = useTasksForUser(user?.id);
+  const { data: teams = [] } = useTeams();
+  const { data: taskTypes = [] } = useTaskTypes();
   if (!user) return null;
 
   const canManage = user.isSuperAdmin || user.leadershipTeamIds.length > 0;
-  const [tasks, teams, taskTypes] = await Promise.all([
-    listTasksForUser(user.id),
-    listTeams(),
-    getTaskTypes(),
-  ]);
 
   const manageableTeams = user.isSuperAdmin
     ? teams.filter((t) => !t.is_core_team)
@@ -80,7 +80,7 @@ export default async function TasksPage() {
               {/* Mobile: card list */}
               <div className="divide-y rounded-lg border sm:hidden">
                 {tasks.map((t) => (
-                  <Link key={t.id} href={`/tasks/${t.id}`} className="block p-3 active:bg-muted">
+                  <Link key={t.id} href={`/tasks/detail?id=${t.id}`} className="block p-3 active:bg-muted">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium text-primary">{t.title}</p>
                       {statusBadge(t.my_status)}
@@ -109,7 +109,7 @@ export default async function TasksPage() {
                     {tasks.map((t) => (
                       <TableRow key={t.id}>
                         <TableCell>
-                          <Link href={`/tasks/${t.id}`} className="font-medium text-primary hover:underline">
+                          <Link href={`/tasks/detail?id=${t.id}`} className="font-medium text-primary hover:underline">
                             {t.title}
                           </Link>
                         </TableCell>

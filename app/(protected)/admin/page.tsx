@@ -1,8 +1,9 @@
-import { redirect } from "next/navigation";
+"use client";
+
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/data/session";
-import { listTeams, getTeamMembers, listAllMembers } from "@/lib/data/teams";
-import { listSuperAdmins } from "@/lib/data/admin";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useTeams, useTeamMembers, useAllMembers } from "@/lib/data/teams";
+import { useSuperAdmins } from "@/lib/data/admin";
 import {
   Card,
   CardContent,
@@ -25,16 +26,16 @@ import { CoreRoleSelect } from "@/components/admin/core-role-form";
 import { SuperAdminManager } from "@/components/admin/super-admin-manager";
 import { SyncTeamsButton } from "@/components/admin/sync-teams-button";
 
-export default async function AdminPage() {
-  const user = await getCurrentUser();
-  if (!user?.isSuperAdmin) redirect("/dashboard");
-
-  const teams = await listTeams();
+export default function AdminPage() {
+  const { data: user } = useCurrentUser();
+  const { data: teams = [] } = useTeams();
   const coreTeam = teams.find((t) => t.is_core_team);
   const operationalTeams = teams.filter((t) => !t.is_core_team);
-  const coreMembers = coreTeam ? await getTeamMembers(coreTeam.id) : [];
-  const allMembers = await listAllMembers();
-  const superAdmins = await listSuperAdmins();
+  const { data: coreMembers = [] } = useTeamMembers(coreTeam?.id ?? "");
+  const { data: allMembers = [] } = useAllMembers();
+  const { data: superAdmins = [] } = useSuperAdmins();
+  if (!user?.isSuperAdmin) return null;
+
   const adminCandidates = allMembers.filter(
     (m) => !superAdmins.some((a) => a.member_id === m.id),
   );
@@ -74,7 +75,7 @@ export default async function AdminPage() {
                 {operationalTeams.map((t) => (
                   <Link
                     key={t.id}
-                    href={`/admin/teams/${t.id}`}
+                    href={`/admin/teams/detail?id=${t.id}`}
                     className="block p-3 active:bg-muted"
                   >
                     <div className="flex items-center justify-between">
@@ -124,7 +125,7 @@ export default async function AdminPage() {
                         <TableCell>{t.member_count}</TableCell>
                         <TableCell className="text-right">
                           <Link
-                            href={`/admin/teams/${t.id}`}
+                            href={`/admin/teams/detail?id=${t.id}`}
                             className="text-sm font-medium text-primary hover:underline"
                           >
                             Manage

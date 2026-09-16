@@ -1,9 +1,11 @@
-import "server-only";
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 import type { NocSubmission } from "@/lib/types/domain";
 
 export async function getOwnNocs(memberId: string): Promise<NocSubmission[]> {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("noc_submissions")
     .select("*")
@@ -21,7 +23,7 @@ export type NocReviewRow = NocSubmission & {
 // Every NOC visible to the caller under RLS (their own team's members if
 // they're leadership, or everyone if Core Team / Super Admin).
 export async function getReviewQueue(): Promise<NocReviewRow[]> {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("noc_submissions")
     .select("*, prm_members(full_name, email)")
@@ -43,10 +45,25 @@ export async function getReviewQueue(): Promise<NocReviewRow[]> {
 }
 
 export async function getSignedNocUrl(filePath: string) {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase.storage
     .from("nocs")
     .createSignedUrl(filePath, 300);
   if (error) return null;
   return data.signedUrl;
+}
+
+// ---------------------------------------------------------------------
+// react-query hooks
+// ---------------------------------------------------------------------
+export function useOwnNocs(memberId: string | undefined) {
+  return useQuery({
+    queryKey: ["own-nocs", memberId],
+    queryFn: () => getOwnNocs(memberId!),
+    enabled: !!memberId,
+  });
+}
+
+export function useReviewQueue(enabled: boolean) {
+  return useQuery({ queryKey: ["noc-review-queue"], queryFn: getReviewQueue, enabled });
 }

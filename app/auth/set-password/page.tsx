@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { setPassword, type AuthActionState } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,12 @@ import {
 const initial: AuthActionState = { error: null };
 
 export default function SetPasswordPage() {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(setPassword, initial);
+
+  useEffect(() => {
+    if (state.success) router.replace("/dashboard");
+  }, [state.success, router]);
 
   return (
     <div className="brand-gradient relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">

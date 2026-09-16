@@ -1,0 +1,48 @@
+name: Deploy to InfinityFree
+
+on:
+  push:
+    branches:
+      - main # Change to 'master' if your main branch is named master
+
+jobs:
+  web-deploy:
+    name: Deploy Website
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get latest code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build static export
+        run: npm run build
+        env:
+          # NEXT_PUBLIC_* vars are baked into the static bundle at build
+          # time — set these as repo secrets (Settings > Secrets and
+          # variables > Actions). Never add SUPABASE_SERVICE_ROLE_KEY
+          # here: the static site must never contain it. That key lives
+          # only in Supabase's Edge Function secrets
+          # (`supabase secrets set`), not in this workflow or the build.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Sync files via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # InfinityFree serves websites from the htdocs directory.
+          server-dir: ./htdocs/
+          # `next build` with output: 'export' (next.config.ts) writes
+          # the static site to ./out/ — that's what gets deployed, not
+          # the repo root.
+          local-dir: ./out/

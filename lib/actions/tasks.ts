@@ -1,13 +1,11 @@
-"use server";
-
-import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/data/session";
+import { createClient } from "@/lib/supabase/client";
+import { fetchCurrentUser } from "@/lib/hooks/use-current-user";
+import { queryClient } from "@/lib/query-client";
 import type { ActionResult } from "@/lib/actions/teams";
 import { parseTabularFile } from "@/lib/utils/parse-tabular";
 
 async function seedMemberStatusesForTask(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createClient>,
   taskId: string,
   teamId: string | null,
 ) {
@@ -29,7 +27,7 @@ export async function createTask(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
   const title = String(formData.get("title") ?? "").trim();
@@ -44,7 +42,7 @@ export async function createTask(
     return { error: "Not authorized for this team." };
   }
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data: created, error } = await supabase
     .from("team_tasks")
     .insert({
@@ -63,7 +61,7 @@ export async function createTask(
 
   await seedMemberStatusesForTask(supabase, created.id, teamId);
 
-  revalidatePath("/tasks");
+  queryClient.invalidateQueries();
   return { error: null, success: `Task "${title}" created.` };
 }
 
@@ -82,7 +80,7 @@ export async function bulkImportTasks(
   _prev: BulkTaskImportResult,
   formData: FormData,
 ): Promise<BulkTaskImportResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user?.isSuperAdmin && !(user && user.leadershipTeamIds.length > 0)) {
     return { error: "Not authorized.", imported: 0, skipped: [] };
   }
@@ -95,7 +93,7 @@ export async function bulkImportTasks(
   const { data: rows, error: parseError } = await parseTabularFile(file);
   if (parseError) return { error: parseError, imported: 0, skipped: [] };
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const [{ data: teams }, { data: taskTypes }] = await Promise.all([
     supabase.from("teams").select("id, slug"),
     supabase.from("task_types").select("id, name, default_points"),
@@ -150,7 +148,7 @@ export async function bulkImportTasks(
     imported++;
   }
 
-  revalidatePath("/tasks");
+  queryClient.invalidateQueries();
   return { error: null, imported, skipped };
 }
 
@@ -158,14 +156,14 @@ export async function submitTask(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
   const taskId = String(formData.get("taskId") ?? "");
   const submissionUrl = String(formData.get("submissionUrl") ?? "").trim();
   if (!taskId) return { error: "Missing task." };
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { error } = await supabase.from("task_member_status").upsert(
     {
       task_id: taskId,
@@ -178,8 +176,7 @@ export async function submitTask(
   );
   if (error) return { error: error.message };
 
-  revalidatePath(`/tasks/${taskId}`);
-  revalidatePath("/tasks");
+  queryClient.invalidateQueries();
   return { error: null, success: "Submission recorded." };
 }
 
@@ -187,7 +184,7 @@ export async function reviewTaskStatus(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
   const taskId = String(formData.get("taskId") ?? "");
@@ -197,7 +194,7 @@ export async function reviewTaskStatus(
     return { error: "Invalid review submission." };
   }
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { error } = await supabase
     .from("task_member_status")
     .update({ status, reviewed_by: user.id, reviewed_at: new Date().toISOString() })
@@ -205,7 +202,7 @@ export async function reviewTaskStatus(
     .eq("member_id", memberId);
   if (error) return { error: error.message };
 
-  revalidatePath(`/tasks/${taskId}`);
+  queryClient.invalidateQueries();
   return { error: null, success: `Marked ${status}.` };
 }
 
@@ -213,20 +210,20 @@ export async function addTaskComment(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
   const taskId = String(formData.get("taskId") ?? "");
   const comment = String(formData.get("comment") ?? "").trim();
   if (!taskId || !comment) return { error: "Comment cannot be empty." };
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { error } = await supabase
     .from("task_comments")
     .insert({ task_id: taskId, member_id: user.id, comment });
   if (error) return { error: error.message };
 
-  revalidatePath(`/tasks/${taskId}`);
+  queryClient.invalidateQueries();
   return { error: null };
 }
 
@@ -234,7 +231,7 @@ export async function addTaskAttachment(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
   const taskId = String(formData.get("taskId") ?? "");
@@ -243,7 +240,7 @@ export async function addTaskAttachment(
     return { error: "Please choose a file." };
   }
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const path = `${taskId}/${user.id}/${Date.now()}-${file.name}`;
 
   const { error: uploadError } = await supabase.storage
@@ -259,6 +256,6 @@ export async function addTaskAttachment(
   });
   if (insertError) return { error: insertError.message };
 
-  revalidatePath(`/tasks/${taskId}`);
+  queryClient.invalidateQueries();
   return { error: null, success: "Attachment uploaded." };
 }

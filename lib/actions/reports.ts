@@ -1,15 +1,13 @@
-"use server";
-
-import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/data/session";
+import { createClient } from "@/lib/supabase/client";
+import { fetchCurrentUser } from "@/lib/hooks/use-current-user";
+import { queryClient } from "@/lib/query-client";
 import type { ActionResult } from "@/lib/actions/teams";
 
 export async function fileReport(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
   const reportedMemberId = String(formData.get("reportedMemberId") ?? "");
@@ -20,7 +18,7 @@ export async function fileReport(
   if (reportedMemberId === user.id) return { error: "You can't report yourself." };
   if (!reason) return { error: "A reason is required." };
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { error } = await supabase.from("member_reports").insert({
     reporter_id: user.id,
     reported_member_id: reportedMemberId,
@@ -29,7 +27,7 @@ export async function fileReport(
   });
   if (error) return { error: error.message };
 
-  revalidatePath("/reports");
+  queryClient.invalidateQueries();
   return { error: null, success: "Report submitted. Only you and admins can see it." };
 }
 
@@ -37,7 +35,7 @@ export async function reviewReport(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user?.isSuperAdmin) return { error: "Not authorized." };
 
   const reportId = String(formData.get("reportId") ?? "");
@@ -46,13 +44,13 @@ export async function reviewReport(
     return { error: "Invalid update." };
   }
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { error } = await supabase
     .from("member_reports")
     .update({ status, reviewed_at: new Date().toISOString(), reviewed_by: user.id })
     .eq("id", reportId);
   if (error) return { error: error.message };
 
-  revalidatePath("/reports");
+  queryClient.invalidateQueries();
   return { error: null, success: "Report updated." };
 }

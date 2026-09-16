@@ -1,11 +1,9 @@
-"use server";
-
-import { revalidatePath } from "next/cache";
-import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/data/session";
+import { createClient } from "@/lib/supabase/client";
+import { fetchCurrentUser } from "@/lib/hooks/use-current-user";
+import { queryClient } from "@/lib/query-client";
 import type { ActionResult } from "@/lib/actions/teams";
 
-async function getSuperAdminRoleId(supabase: Awaited<ReturnType<typeof createClient>>) {
+async function getSuperAdminRoleId(supabase: ReturnType<typeof createClient>) {
   const { data } = await supabase.from("roles").select("id").eq("name", "Super Admin").single();
   return data?.id ?? null;
 }
@@ -19,13 +17,13 @@ export async function grantSuperAdmin(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user?.isSuperAdmin) return { error: "Not authorized." };
 
   const memberId = String(formData.get("memberId") ?? "");
   if (!memberId) return { error: "Missing member." };
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const roleId = await getSuperAdminRoleId(supabase);
   if (!roleId) return { error: "Super Admin role not found." };
 
@@ -34,7 +32,7 @@ export async function grantSuperAdmin(
     .insert({ member_id: memberId, role_id: roleId, granted_by: user.id });
   if (error) return { error: error.message };
 
-  revalidatePath("/admin");
+  queryClient.invalidateQueries();
   return { error: null, success: "Admin access granted." };
 }
 
@@ -42,13 +40,13 @@ export async function revokeSuperAdmin(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user?.isSuperAdmin) return { error: "Not authorized." };
 
   const memberId = String(formData.get("memberId") ?? "");
   if (!memberId) return { error: "Missing member." };
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const roleId = await getSuperAdminRoleId(supabase);
   if (!roleId) return { error: "Super Admin role not found." };
 
@@ -67,23 +65,25 @@ export async function revokeSuperAdmin(
     .eq("role_id", roleId);
   if (error) return { error: error.message };
 
-  revalidatePath("/admin");
+  queryClient.invalidateQueries();
   return { error: null, success: "Admin access revoked." };
 }
 
 // ---------------------------------------------------------------------
-// Blocking = membership cancellation: status -> inactive, plus banning
-// the auth account so an already-issued session token can't keep
-// working. The proxy (lib/supabase/middleware.ts) also checks status
-// on every request and force-signs-out a blocked user mid-session,
-// since a JWT already in the browser stays technically valid for its
-// remaining lifetime even after a ban is set.
+// Blocking = membership cancellation: status -> inactive (RLS-gated,
+// safe to do directly from the client), plus banning the auth account
+// — that half requires the service-role key, so it's delegated to the
+// `block-member` Supabase Edge Function
+// (supabase/functions/block-member). AuthGuard also force-signs-out a
+// blocked member on their next request, since a JWT already issued
+// stays technically valid for the rest of its lifetime even after the
+// ban is set.
 // ---------------------------------------------------------------------
 export async function blockMember(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user?.isSuperAdmin) return { error: "Not authorized." };
 
   const memberId = String(formData.get("memberId") ?? "");
@@ -91,7 +91,7 @@ export async function blockMember(
   if (!memberId) return { error: "Missing member." };
   if (memberId === user.id) return { error: "You can't block yourself." };
 
-  const supabase = await createClient();
+  const supabase = createClient();
 
   const { data: targetRoles } = await supabase
     .from("user_roles")
@@ -117,9 +117,8 @@ export async function blockMember(
     .eq("id", memberId);
   if (updateError) return { error: updateError.message };
 
-  const admin = createServiceRoleClient();
-  const { error: banError } = await admin.auth.admin.updateUserById(memberId, {
-    ban_duration: "87600h", // ~10 years; effectively indefinite, reversible via unblock
+  const { error: banError } = await supabase.functions.invoke("block-member", {
+    body: { memberId, banDuration: "87600h" }, // ~10 years; effectively indefinite, reversible via unblock
   });
   if (banError) {
     return {
@@ -127,8 +126,7 @@ export async function blockMember(
     };
   }
 
-  revalidatePath("/members");
-  revalidatePath("/admin");
+  queryClient.invalidateQueries();
   return { error: null, success: "Member blocked and membership cancelled." };
 }
 
@@ -136,26 +134,24 @@ export async function unblockMember(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user?.isSuperAdmin) return { error: "Not authorized." };
 
   const memberId = String(formData.get("memberId") ?? "");
   if (!memberId) return { error: "Missing member." };
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { error: updateError } = await supabase
     .from("prm_members")
     .update({ status: "active", blocked_at: null, blocked_reason: null, blocked_by: null })
     .eq("id", memberId);
   if (updateError) return { error: updateError.message };
 
-  const admin = createServiceRoleClient();
-  const { error: banError } = await admin.auth.admin.updateUserById(memberId, {
-    ban_duration: "none",
+  const { error: banError } = await supabase.functions.invoke("block-member", {
+    body: { memberId, banDuration: "none" },
   });
   if (banError) return { error: banError.message };
 
-  revalidatePath("/members");
-  revalidatePath("/admin");
+  queryClient.invalidateQueries();
   return { error: null, success: "Member unblocked." };
 }

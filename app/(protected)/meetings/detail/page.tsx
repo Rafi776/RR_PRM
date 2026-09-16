@@ -1,5 +1,9 @@
-import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/data/session";
+"use client";
+
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getMeetingDetail, getSignedMinutesUrl } from "@/lib/data/meetings";
 import {
   Card,
@@ -11,27 +15,30 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { AttendanceChecklist } from "@/components/meetings/attendance-checklist";
 
-export default async function MeetingDetailPage({
-  params,
-}: {
-  params: Promise<{ meetingId: string }>;
-}) {
-  const { meetingId } = await params;
-  const user = await getCurrentUser();
-  if (!user) return null;
+function MeetingDetailInner() {
+  const meetingId = useSearchParams().get("id") ?? undefined;
+  const { data: user } = useCurrentUser();
 
-  const detail = await getMeetingDetail(meetingId).catch(() => null);
-  if (!detail) notFound();
+  const { data: detail } = useQuery({
+    queryKey: ["meeting-detail-full", meetingId],
+    queryFn: async () => {
+      const d = await getMeetingDetail(meetingId!);
+      const attachmentUrl = d.meeting.attachment_url
+        ? await getSignedMinutesUrl(d.meeting.attachment_url)
+        : null;
+      return { ...d, attachmentUrl };
+    },
+    enabled: !!meetingId,
+  });
 
-  const { meeting, roster } = detail;
+  if (!user || !meetingId) return null;
+  if (!detail) return <p className="p-8 text-sm text-muted-foreground">Loading…</p>;
+
+  const { meeting, roster, attachmentUrl } = detail;
   const canEditAttendance =
     user.isSuperAdmin ||
     (meeting.scope === "central_core" && user.isCoreTeam) ||
     (meeting.scope === "team" && meeting.team_id && user.leadershipTeamIds.includes(meeting.team_id));
-
-  const attachmentUrl = meeting.attachment_url
-    ? await getSignedMinutesUrl(meeting.attachment_url)
-    : null;
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -88,5 +95,13 @@ export default async function MeetingDetailPage({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function MeetingDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <MeetingDetailInner />
+    </Suspense>
   );
 }

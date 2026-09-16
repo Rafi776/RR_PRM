@@ -1,6 +1,10 @@
-import { getCurrentUser } from "@/lib/data/session";
-import { getGlobalLeaderboard, getTeamLeaderboard } from "@/lib/data/leaderboard";
-import { listTeams } from "@/lib/data/teams";
+"use client";
+
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useGlobalLeaderboard, useTeamLeaderboard } from "@/lib/data/leaderboard";
+import { useTeams } from "@/lib/data/teams";
 import {
   Card,
   CardContent,
@@ -122,24 +126,20 @@ function LeaderboardRows({
   );
 }
 
-export default async function LeaderboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ team?: string }>;
-}) {
-  const user = await getCurrentUser();
-  if (!user) return null;
+function LeaderboardPageInner() {
+  const { data: user } = useCurrentUser();
+  const searchParams = useSearchParams();
+  const selectedTeamSlug = searchParams.get("team") ?? undefined;
 
-  const { team: selectedTeamSlug } = await searchParams;
-  const teams = await listTeams();
+  const { data: teams = [] } = useTeams();
   const operationalTeams = teams.filter((t) => !t.is_core_team);
   const selectedTeam =
     operationalTeams.find((t) => t.slug === selectedTeamSlug) ?? operationalTeams[0];
 
-  const [global, teamRows] = await Promise.all([
-    getGlobalLeaderboard(),
-    selectedTeam ? getTeamLeaderboard(selectedTeam.id) : Promise.resolve([]),
-  ]);
+  const { data: global = [] } = useGlobalLeaderboard();
+  const { data: teamRows = [] } = useTeamLeaderboard(selectedTeam?.id);
+
+  if (!user) return null;
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -207,5 +207,13 @@ export default async function LeaderboardPage({
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function LeaderboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <LeaderboardPageInner />
+    </Suspense>
   );
 }

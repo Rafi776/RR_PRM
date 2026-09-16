@@ -1,5 +1,7 @@
-import "server-only";
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 
 export type TeamWithLeadership = {
   id: string;
@@ -13,7 +15,7 @@ export type TeamWithLeadership = {
 };
 
 export async function listTeams(): Promise<TeamWithLeadership[]> {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data: teams, error } = await supabase
     .from("teams")
     .select(
@@ -57,7 +59,7 @@ export async function listTeams(): Promise<TeamWithLeadership[]> {
 }
 
 export async function getTeam(teamId: string) {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("teams")
     .select("id, name, slug, description, is_core_team")
@@ -86,7 +88,7 @@ export type TeamMemberRow = {
 };
 
 export async function getTeamMembers(teamId: string): Promise<TeamMemberRow[]> {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("team_memberships")
     .select(
@@ -131,7 +133,7 @@ export async function getTeamMembers(teamId: string): Promise<TeamMemberRow[]> {
 }
 
 export async function listAllMembers() {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("prm_members")
     .select("id, full_name, email, status")
@@ -141,7 +143,7 @@ export async function listAllMembers() {
 }
 
 export async function listAllRoles() {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase.from("roles").select("id, name").order("name");
   if (error) throw error;
   return data ?? [];
@@ -186,4 +188,35 @@ export async function getOrganogramData(): Promise<OrganogramData> {
       deputy_coordinator: t.deputy_coordinator,
     })),
   };
+}
+
+// ---------------------------------------------------------------------
+// react-query hooks
+// ---------------------------------------------------------------------
+export function useTeams() {
+  return useQuery({ queryKey: ["teams"], queryFn: listTeams });
+}
+
+export function useTeam(teamId: string) {
+  return useQuery({ queryKey: ["team", teamId], queryFn: () => getTeam(teamId), enabled: !!teamId });
+}
+
+export function useTeamMembers(teamId: string) {
+  return useQuery({
+    queryKey: ["team-members", teamId],
+    queryFn: () => getTeamMembers(teamId),
+    enabled: !!teamId,
+  });
+}
+
+export function useAllMembers() {
+  return useQuery({ queryKey: ["all-members"], queryFn: listAllMembers });
+}
+
+export function useAllRoles() {
+  return useQuery({ queryKey: ["all-roles"], queryFn: listAllRoles });
+}
+
+export function useOrganogram() {
+  return useQuery({ queryKey: ["organogram"], queryFn: getOrganogramData });
 }

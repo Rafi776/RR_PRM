@@ -1,4 +1,7 @@
-import { getCurrentUser } from "@/lib/data/session";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getOwnNocs, getReviewQueue, getSignedNocUrl } from "@/lib/data/noc";
 import {
   Card,
@@ -27,23 +30,30 @@ function statusBadge(status: NocStatus) {
   return <Badge variant={variant}>{status}</Badge>;
 }
 
-export default async function NocPage() {
-  const user = await getCurrentUser();
+export default function NocPage() {
+  const { data: user } = useCurrentUser();
+  const isReviewer = !!user && (user.isCoreTeam || user.leadershipTeamIds.length > 0);
+
+  const { data: myNocsWithUrl = [] } = useQuery({
+    queryKey: ["own-nocs-with-url", user?.id],
+    queryFn: async () => {
+      const nocs = await getOwnNocs(user!.id);
+      return Promise.all(nocs.map(async (n) => ({ ...n, url: await getSignedNocUrl(n.file_path) })));
+    },
+    enabled: !!user,
+  });
+
+  const { data: pendingWithUrl = [] } = useQuery({
+    queryKey: ["noc-review-queue-with-url"],
+    queryFn: async () => {
+      const queue = await getReviewQueue();
+      const pending = queue.filter((n) => n.status === "pending");
+      return Promise.all(pending.map(async (n) => ({ ...n, url: await getSignedNocUrl(n.file_path) })));
+    },
+    enabled: isReviewer,
+  });
+
   if (!user) return null;
-
-  const isReviewer = user.isCoreTeam || user.leadershipTeamIds.length > 0;
-  const [myNocs, reviewQueue] = await Promise.all([
-    getOwnNocs(user.id),
-    isReviewer ? getReviewQueue() : Promise.resolve([]),
-  ]);
-
-  const myNocsWithUrl = await Promise.all(
-    myNocs.map(async (n) => ({ ...n, url: await getSignedNocUrl(n.file_path) })),
-  );
-  const pendingQueue = reviewQueue.filter((n) => n.status === "pending");
-  const pendingWithUrl = await Promise.all(
-    pendingQueue.map(async (n) => ({ ...n, url: await getSignedNocUrl(n.file_path) })),
-  );
 
   const myNocsTable = (
     <Card>

@@ -1,4 +1,3 @@
-import "server-only";
 import Papa from "papaparse";
 import ExcelJS from "exceljs";
 

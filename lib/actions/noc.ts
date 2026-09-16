@@ -1,15 +1,13 @@
-"use server";
-
-import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/data/session";
+import { createClient } from "@/lib/supabase/client";
+import { fetchCurrentUser } from "@/lib/hooks/use-current-user";
+import { queryClient } from "@/lib/query-client";
 import type { ActionResult } from "@/lib/actions/teams";
 
 export async function uploadNoc(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
   const file = formData.get("file");
@@ -20,7 +18,7 @@ export async function uploadNoc(
     return { error: "Only PDF or image files are accepted." };
   }
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const path = `${user.id}/${Date.now()}-${file.name}`;
 
   const { error: uploadError } = await supabase.storage
@@ -36,7 +34,7 @@ export async function uploadNoc(
   });
   if (insertError) return { error: insertError.message };
 
-  revalidatePath("/noc");
+  queryClient.invalidateQueries();
   return { error: null, success: "NOC uploaded — pending review." };
 }
 
@@ -44,7 +42,7 @@ export async function reviewNoc(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
   const nocId = String(formData.get("nocId") ?? "");
@@ -58,7 +56,7 @@ export async function reviewNoc(
     return { error: "A rejection reason is required." };
   }
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { error } = await supabase
     .from("noc_submissions")
     .update({
@@ -71,6 +69,6 @@ export async function reviewNoc(
 
   if (error) return { error: error.message };
 
-  revalidatePath("/noc");
+  queryClient.invalidateQueries();
   return { error: null, success: `NOC ${decision}.` };
 }

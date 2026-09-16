@@ -1,5 +1,7 @@
-import "server-only";
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 import type { MeetingScope, AttendanceStatus } from "@/lib/types/domain";
 
 export type MeetingListRow = {
@@ -12,7 +14,7 @@ export type MeetingListRow = {
 };
 
 export async function listMeetings(): Promise<MeetingListRow[]> {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("team_meeting_minutes")
     .select("id, title, scope, team_id, meeting_date, teams(name)")
@@ -34,7 +36,7 @@ export async function listMeetings(): Promise<MeetingListRow[]> {
 }
 
 export async function getMeetingDetail(meetingId: string) {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data: meeting, error } = await supabase
     .from("team_meeting_minutes")
     .select("id, title, scope, team_id, meeting_date, agenda, summary, attachment_url, teams(name)")
@@ -95,10 +97,25 @@ export async function getMeetingDetail(meetingId: string) {
 }
 
 export async function getSignedMinutesUrl(filePath: string) {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase.storage
     .from("meeting-minutes")
     .createSignedUrl(filePath, 300);
   if (error) return null;
   return data.signedUrl;
+}
+
+// ---------------------------------------------------------------------
+// react-query hooks
+// ---------------------------------------------------------------------
+export function useMeetings() {
+  return useQuery({ queryKey: ["meetings"], queryFn: listMeetings });
+}
+
+export function useMeetingDetail(meetingId: string | undefined) {
+  return useQuery({
+    queryKey: ["meeting-detail", meetingId],
+    queryFn: () => getMeetingDetail(meetingId!),
+    enabled: !!meetingId,
+  });
 }

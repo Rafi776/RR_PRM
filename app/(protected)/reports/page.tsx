@@ -1,5 +1,7 @@
-import { getCurrentUser } from "@/lib/data/session";
-import { listVisibleReports } from "@/lib/data/reports";
+"use client";
+
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useVisibleReports } from "@/lib/data/reports";
 import {
   Card,
   CardContent,
@@ -24,13 +26,12 @@ function statusBadge(status: ReportStatus) {
   return <Badge variant={variant}>{status}</Badge>;
 }
 
-export default async function ReportsPage() {
-  const user = await getCurrentUser();
-  if (!user) return null;
-
+export default function ReportsPage() {
+  const { data: user } = useCurrentUser();
   // RLS already scopes this: a regular member's query returns only
   // reports they filed; a Super Admin's returns every report.
-  const reports = await listVisibleReports();
+  const { data: reports = [] } = useVisibleReports();
+  if (!user) return null;
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">

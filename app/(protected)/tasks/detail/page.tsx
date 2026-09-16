@@ -1,5 +1,9 @@
-import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/data/session";
+"use client";
+
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getTaskDetail, getSignedTaskAttachmentUrl } from "@/lib/data/tasks";
 import {
   Card,
@@ -35,26 +39,29 @@ function statusBadge(status: TaskStatus) {
   return <Badge variant={variant}>{status.replace("_", " ")}</Badge>;
 }
 
-export default async function TaskDetailPage({
-  params,
-}: {
-  params: Promise<{ taskId: string }>;
-}) {
-  const { taskId } = await params;
-  const user = await getCurrentUser();
-  if (!user) return null;
+function TaskDetailInner() {
+  const taskId = useSearchParams().get("id") ?? undefined;
+  const { data: user } = useCurrentUser();
 
-  const detail = await getTaskDetail(taskId).catch(() => null);
-  if (!detail) notFound();
+  const { data: detail } = useQuery({
+    queryKey: ["task-detail-full", taskId],
+    queryFn: async () => {
+      const d = await getTaskDetail(taskId!);
+      const attachmentsWithUrl = await Promise.all(
+        d.attachments.map(async (a) => ({ ...a, url: await getSignedTaskAttachmentUrl(a.file_path) })),
+      );
+      return { ...d, attachmentsWithUrl };
+    },
+    enabled: !!taskId,
+  });
 
-  const { task, statuses, comments, attachments } = detail;
+  if (!user || !taskId) return null;
+  if (!detail) return <p className="p-8 text-sm text-muted-foreground">Loading…</p>;
+
+  const { task, statuses, comments, attachmentsWithUrl } = detail;
   const canReview =
     user.isSuperAdmin || (task.team_id && user.leadershipTeamIds.includes(task.team_id));
   const myStatus = statuses.find((s) => s.member_id === user.id);
-
-  const attachmentsWithUrl = await Promise.all(
-    attachments.map(async (a) => ({ ...a, url: await getSignedTaskAttachmentUrl(a.file_path) })),
-  );
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -210,5 +217,13 @@ export default async function TaskDetailPage({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function TaskDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <TaskDetailInner />
+    </Suspense>
   );
 }

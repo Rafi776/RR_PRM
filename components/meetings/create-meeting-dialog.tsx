@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { createMeeting } from "@/lib/actions/meetings";
-import type { ActionResult } from "@/lib/actions/teams";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createMeeting, type CreateMeetingResult } from "@/lib/actions/meetings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 
-const initial: ActionResult = { error: null };
+const initial: CreateMeetingResult = { error: null };
 
 export function CreateMeetingDialog({
   teams,
@@ -33,8 +33,17 @@ export function CreateMeetingDialog({
   teams: { id: string; name: string }[];
   isCoreTeam: boolean;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(createMeeting, initial);
+
+  useEffect(() => {
+    if (state.meetingId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- closing the dialog in response to a server action result, not deriving render state
+      setOpen(false);
+      router.push(`/meetings/detail?id=${state.meetingId}`);
+    }
+  }, [state.meetingId, router]);
   const [scope, setScope] = useState<"team" | "central_core">(teams.length ? "team" : "central_core");
   const [teamId, setTeamId] = useState(teams[0]?.id ?? "");
 

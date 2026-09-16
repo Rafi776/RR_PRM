@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -rf \"app/\\(protected\\)/tasks/[taskId]\")",
+      "Bash(rm -rf \"app/\\(protected\\)/meetings/[meetingId]\")",
+      "Bash(rm -rf \"app/\\(protected\\)/admin/teams/[teamId]\")",
+      "Bash(npx next *)",
+      "Bash(npx eslint *)",
+      "Bash(cat /tmp/serve.log 2>&1)",
+      "Read(//private/tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"root: %{http_code}\\\\n\" http://localhost:3001/)",
+      "Bash(curl -s -o /dev/null -w \"login: %{http_code}\\\\n\" http://localhost:3001/login/)",
+      "Bash(curl -s -o /dev/null -w \"dashboard: %{http_code}\\\\n\" http://localhost:3001/dashboard/)",
+      "Bash(curl -s http://localhost:3001/login/)",
+      "Bash(pkill -f \"serve out\")"
+    ],
+    "additionalDirectories": [
+      "/Users/mdrakibulhasanrafi/Personal/prm/app/(protected)/tasks/[taskId]",
+      "/Users/mdrakibulhasanrafi/Personal/prm/app/(protected)/meetings/[meetingId]",
+      "/Users/mdrakibulhasanrafi/Personal/prm/app/(protected)/admin/teams/[teamId]"
+    ]
+  }
+}

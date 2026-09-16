@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +26,7 @@ export function UserMenu({
   roles: string[];
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const initials = fullName
     .split(" ")
     .map((p) => p[0])
@@ -66,11 +69,11 @@ export function UserMenu({
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          onClick={() => {
-            fetch("/auth/signout", { method: "POST" }).then(() => {
-              router.push("/login");
-              router.refresh();
-            });
+          onClick={async () => {
+            const supabase = createClient();
+            await supabase.auth.signOut();
+            queryClient.clear();
+            router.push("/login");
           }}
         >
           <LogOut className="h-4 w-4" />

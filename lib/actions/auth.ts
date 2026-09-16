@@ -1,9 +1,6 @@
-"use server";
+import { createClient } from "@/lib/supabase/client";
 
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-
-export type AuthActionState = { error: string | null };
+export type AuthActionState = { error: string | null; success?: boolean };
 
 export async function signInWithPassword(
   _prevState: AuthActionState,
@@ -11,20 +8,16 @@ export async function signInWithPassword(
 ): Promise<AuthActionState> {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
-  const redirectTo = String(formData.get("redirectTo") ?? "/dashboard");
 
   if (!email || !password) {
     return { error: "Email and password are required." };
   }
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (error) {
-    return { error: error.message };
-  }
-
-  redirect(redirectTo);
+  if (error) return { error: error.message };
+  return { error: null, success: true };
 }
 
 export async function setPassword(
@@ -41,7 +34,7 @@ export async function setPassword(
     return { error: "Passwords don't match." };
   }
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -51,6 +44,5 @@ export async function setPassword(
 
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { error: error.message };
-
-  redirect("/dashboard");
+  return { error: null, success: true };
 }

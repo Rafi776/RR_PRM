@@ -1,5 +1,7 @@
-import "server-only";
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 
 export type SuperAdminRow = {
   member_id: string;
@@ -8,7 +10,7 @@ export type SuperAdminRow = {
 };
 
 export async function listSuperAdmins(): Promise<SuperAdminRow[]> {
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("user_roles")
     .select("member_id, prm_members(full_name, email), roles!inner(name)")
@@ -27,4 +29,8 @@ export async function listSuperAdmins(): Promise<SuperAdminRow[]> {
       email: single?.email ?? "",
     };
   });
+}
+
+export function useSuperAdmins() {
+  return useQuery({ queryKey: ["super-admins"], queryFn: listSuperAdmins });
 }

@@ -1,9 +1,6 @@
-"use server";
-
-import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
-import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/data/session";
+import { createClient } from "@/lib/supabase/client";
+import { fetchCurrentUser } from "@/lib/hooks/use-current-user";
+import { queryClient } from "@/lib/query-client";
 import { parseTabularFile } from "@/lib/utils/parse-tabular";
 
 export type ActionResult = { error: string | null; success?: string };
@@ -20,14 +17,14 @@ export async function createTeam(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user?.isSuperAdmin) return { error: "Not authorized." };
 
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   if (!name) return { error: "Team name is required." };
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { error } = await supabase.from("teams").insert({
     name,
     slug: slugify(name),
@@ -36,7 +33,7 @@ export async function createTeam(
   });
 
   if (error) return { error: error.message };
-  revalidatePath("/admin");
+  queryClient.invalidateQueries();
   return { error: null, success: `Team "${name}" created.` };
 }
 
@@ -44,7 +41,7 @@ export async function setTeamLeadership(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   const teamId = String(formData.get("teamId") ?? "");
   const memberId = String(formData.get("memberId") ?? "");
   const role = String(formData.get("role") ?? ""); // "coordinator" | "deputy"
@@ -56,7 +53,7 @@ export async function setTeamLeadership(
     return { error: "Missing or invalid fields." };
   }
 
-  const supabase = await createClient();
+  const supabase = createClient();
 
   // Clear the existing holder of this leadership slot on the team, then
   // upsert the new one — the DB's partial unique index also protects
@@ -78,8 +75,7 @@ export async function setTeamLeadership(
     );
   if (upsertError) return { error: upsertError.message };
 
-  revalidatePath(`/admin/teams/${teamId}`);
-  revalidatePath("/admin");
+  queryClient.invalidateQueries();
   return { error: null, success: "Leadership updated." };
 }
 
@@ -87,7 +83,7 @@ export async function addTeamMember(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   const teamId = String(formData.get("teamId") ?? "");
   const memberId = String(formData.get("memberId") ?? "");
 
@@ -96,13 +92,13 @@ export async function addTeamMember(
   }
   if (!teamId || !memberId) return { error: "Missing fields." };
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { error } = await supabase
     .from("team_memberships")
     .upsert({ team_id: teamId, member_id: memberId }, { onConflict: "team_id,member_id" });
   if (error) return { error: error.message };
 
-  revalidatePath(`/admin/teams/${teamId}`);
+  queryClient.invalidateQueries();
   return { error: null, success: "Member added to team." };
 }
 
@@ -110,14 +106,14 @@ export async function setCoreRole(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user?.isSuperAdmin) return { error: "Not authorized." };
 
   const memberId = String(formData.get("memberId") ?? "");
   const coreRole = String(formData.get("coreRole") ?? "") || null;
   if (!memberId) return { error: "Missing member." };
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { data: coreTeam } = await supabase
     .from("teams")
     .select("id")
@@ -136,67 +132,31 @@ export async function setCoreRole(
   );
   if (error) return { error: error.message };
 
-  revalidatePath("/admin");
+  queryClient.invalidateQueries();
   return { error: null, success: "Core role updated." };
 }
 
 // ---------------------------------------------------------------------
-// Bulk member onboarding via CSV.
-// Expected columns: full_name, email, phone (optional), bs_id (optional)
-// Creates an auth.users invite + prm_members row per data row. Runs with
-// the service-role client since inviting users and inserting members
-// must bypass RLS and requires the Auth Admin API.
+// Bulk member onboarding via CSV/Excel. Parsing happens here in the
+// browser (parseTabularFile), but creating auth accounts requires the
+// service-role key, which can never live in a static site's bundle — so
+// the parsed rows are handed to the `bulk-import-members` Supabase Edge
+// Function (supabase/functions/bulk-import-members), which does the
+// createUser/generateLink/insert loop server-side and returns the same
+// shape this action used to build directly.
 // ---------------------------------------------------------------------
 export type BulkImportResult = {
   error: string | null;
   imported: number;
   skipped: { row: number; reason: string }[];
-  // email + a one-time "set your password" link, generated locally with
-  // the Admin API rather than sent by Supabase's built-in mailer, which
-  // has a very low default rate limit (fine for a handful of invites,
-  // not for a few hundred). Distribute these yourself in one batch
-  // email/message rather than relying on Supabase to send them.
   setupLinks: { email: string; link: string }[];
 };
-
-function randomTempPassword() {
-  // Only ever used server-side as a throwaway initial password the
-  // member immediately overwrites via their setup link — never surfaced
-  // to anyone.
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return Buffer.from(bytes).toString("base64url");
-}
-
-// Runs `fn` over `items` with at most `concurrency` in flight at once.
-// 250 sequential Admin API round-trips (createUser + generateLink each)
-// took over 4 minutes end-to-end — long enough that an admin waiting on
-// an unresponsive dialog understandably re-submitted, which is what
-// actually caused this bug: the second submission raced the first and
-// hit "already registered" for every row. Bounded concurrency cuts wall
-// time to a fraction of that without hammering the Auth Admin API.
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function worker() {
-    while (next < items.length) {
-      const i = next++;
-      results[i] = await fn(items[i], i);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
-  return results;
-}
 
 export async function bulkImportMembers(
   _prev: BulkImportResult,
   formData: FormData,
 ): Promise<BulkImportResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user?.isSuperAdmin) {
     return { error: "Not authorized.", imported: 0, skipped: [], setupLinks: [] };
   }
@@ -209,100 +169,22 @@ export async function bulkImportMembers(
   const { data: rows, error: parseError } = await parseTabularFile(file);
   if (parseError) return { error: parseError, imported: 0, skipped: [], setupLinks: [] };
 
-  const headerList = await headers();
-  const origin =
+  const supabase = createClient();
+  const redirectOrigin =
     process.env.NEXT_PUBLIC_SITE_URL ??
-    `${headerList.get("x-forwarded-proto") ?? "http"}://${headerList.get("host")}`;
-  const recoveryRedirectTo = `${origin}/auth/callback?redirectTo=/auth/set-password`;
+    (typeof window !== "undefined" ? window.location.origin : "");
 
-  const admin = createServiceRoleClient();
-
-  // Fast-path re-submissions (or a re-uploaded file with overlapping
-  // rows): skip anyone already imported without touching the Auth
-  // Admin API at all, instead of a slow, confusing "already registered"
-  // failure per row.
-  const { data: existingRows } = await admin.from("prm_members").select("email");
-  const existingEmails = new Set(
-    (existingRows ?? []).map((r: { email: string }) => r.email.toLowerCase()),
+  const { data, error } = await supabase.functions.invoke<BulkImportResult>(
+    "bulk-import-members",
+    { body: { rows, redirectOrigin } },
   );
 
-  type RowOutcome =
-    | { kind: "skip"; row: number; reason: string }
-    | { kind: "imported"; email: string; link: string | null };
-
-  const outcomes = await mapWithConcurrency(rows, 10, async (row, i): Promise<RowOutcome> => {
-    const email = row.email?.trim();
-    // Accepts either "name" or "full_name" as the header for this column.
-    const fullName = (row.name ?? row.full_name)?.trim();
-
-    if (!email || !fullName) {
-      return { kind: "skip", row: i + 2, reason: "Missing name or email." };
-    }
-    if (existingEmails.has(email.toLowerCase())) {
-      return { kind: "skip", row: i + 2, reason: "Already imported." };
-    }
-
-    // createUser (unlike inviteUserByEmail) does not send an email, so
-    // it isn't subject to Supabase's mailer rate limit — safe for bulk
-    // imports of any size.
-    const { data: created, error: createError } = await admin.auth.admin.createUser({
-      email,
-      password: randomTempPassword(),
-      email_confirm: true,
-    });
-
-    if (createError || !created?.user) {
-      return {
-        kind: "skip",
-        row: i + 2,
-        reason: createError?.message ?? "Account creation failed.",
-      };
-    }
-
-    const { error: insertError } = await admin.from("prm_members").insert({
-      id: created.user.id,
-      full_name: fullName,
-      email,
-      phone: row.phone?.trim() || null,
-      photo: row.photo?.trim() || null,
-      bs_id: row.bs_id?.trim() || null,
-      stage: row.stage?.trim() || null,
-      scout_group: row.scout_group?.trim() || null,
-      district: row.district?.trim() || null,
-      team_name: row.team_name?.trim() || null,
-      position: row.position?.trim() || null,
-    });
-
-    if (insertError) {
-      return { kind: "skip", row: i + 2, reason: insertError.message };
-    }
-
-    // generateLink only returns a URL — it does not dispatch email — so
-    // this step is also unaffected by the mailer rate limit.
-    const { data: linkData } = await admin.auth.admin.generateLink({
-      type: "recovery",
-      email,
-      options: { redirectTo: recoveryRedirectTo },
-    });
-
-    return { kind: "imported", email, link: linkData?.properties?.action_link ?? null };
-  });
-
-  let imported = 0;
-  const skipped: { row: number; reason: string }[] = [];
-  const setupLinks: { email: string; link: string }[] = [];
-
-  for (const outcome of outcomes) {
-    if (outcome.kind === "skip") {
-      skipped.push({ row: outcome.row, reason: outcome.reason });
-    } else {
-      imported++;
-      if (outcome.link) setupLinks.push({ email: outcome.email, link: outcome.link });
-    }
+  if (error) {
+    return { error: error.message, imported: 0, skipped: [], setupLinks: [] };
   }
 
-  revalidatePath("/admin");
-  return { error: null, imported, skipped, setupLinks };
+  queryClient.invalidateQueries();
+  return data ?? { error: "No response from import function.", imported: 0, skipped: [], setupLinks: [] };
 }
 
 // ---------------------------------------------------------------------
@@ -317,7 +199,7 @@ export async function updateMemberDetails(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user?.isSuperAdmin && !(user && user.leadershipTeamIds.length > 0)) {
     return { error: "Not authorized." };
   }
@@ -333,7 +215,7 @@ export async function updateMemberDetails(
   const bsId = String(formData.get("bsId") ?? "").trim();
   const status = String(formData.get("status") ?? "active");
 
-  const supabase = await createClient();
+  const supabase = createClient();
   const { error } = await supabase
     .from("prm_members")
     .update({
@@ -353,8 +235,7 @@ export async function updateMemberDetails(
   // treat it as unauthorized rather than reporting false success.
   if (error) return { error: error.message };
 
-  revalidatePath("/members");
-  revalidatePath("/admin");
+  queryClient.invalidateQueries();
   return { error: null, success: "Member record updated." };
 }
 
@@ -383,12 +264,12 @@ export async function syncTeamsFromMemberRecords(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- required by useActionState's action signature; this action takes no form input
   _formData: FormData,
 ): Promise<SyncTeamsResult> {
-  const user = await getCurrentUser();
+  const user = await fetchCurrentUser();
   if (!user?.isSuperAdmin) {
     return { error: "Not authorized.", teamsCreated: [], membersLinked: 0 };
   }
 
-  const supabase = await createClient();
+  const supabase = createClient();
 
   const [{ data: existingTeams }, { data: members }] = await Promise.all([
     supabase.from("teams").select("id, name, is_core_team"),
@@ -443,8 +324,7 @@ export async function syncTeamsFromMemberRecords(
     if (error) return { error: error.message, teamsCreated: [], membersLinked: 0 };
   }
 
-  revalidatePath("/admin");
-  revalidatePath("/members");
+  queryClient.invalidateQueries();
   return {
     error: null,
     teamsCreated: createdTeams.map((t) => t.name),

@@ -1,5 +1,7 @@
-import { getCurrentUser } from "@/lib/data/session";
-import { getOwnProfile } from "@/lib/data/members";
+"use client";
+
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useOwnProfile } from "@/lib/data/members";
 import {
   Card,
   CardContent,
@@ -20,12 +22,10 @@ function Field({ label, value }: { label: string; value: string | null }) {
   );
 }
 
-export default async function ProfilePage() {
-  const user = await getCurrentUser();
-  if (!user) return null;
-
-  const profile = await getOwnProfile(user.id);
-  if (!profile) return null;
+export default function ProfilePage() {
+  const { data: user } = useCurrentUser();
+  const { data: profile } = useOwnProfile(user?.id);
+  if (!user || !profile) return null;
 
   return (
     <div className="max-w-2xl space-y-6 p-4 sm:p-6 lg:p-8">
