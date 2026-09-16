@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createTask } from "@/lib/actions/tasks";
 import type { ActionResult } from "@/lib/actions/teams";
+import { useTeamMembers } from "@/lib/data/teams";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,8 +38,11 @@ export function CreateTaskDialog({
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(createTask, initial);
   const [teamId, setTeamId] = useState("global");
+  const [assigneeId, setAssigneeId] = useState("everyone");
   const [taskTypeId, setTaskTypeId] = useState("none");
   const [points, setPoints] = useState("0");
+
+  const { data: teamMembers = [] } = useTeamMembers(teamId === "global" ? "" : teamId);
 
   useEffect(() => {
     if (state.success) {
@@ -61,6 +65,11 @@ export function CreateTaskDialog({
           </DialogHeader>
           <div className="space-y-4 py-4">
             <input type="hidden" name="teamId" value={teamId === "global" ? "" : teamId} />
+            <input
+              type="hidden"
+              name="assigneeId"
+              value={assigneeId === "everyone" ? "" : assigneeId}
+            />
             <input type="hidden" name="taskTypeId" value={taskTypeId === "none" ? "" : taskTypeId} />
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
@@ -73,8 +82,18 @@ export function CreateTaskDialog({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Team</Label>
-                <Select value={teamId} onValueChange={(v) => setTeamId(v ?? "global")}>
-                  <SelectTrigger>
+                <Select
+                  value={teamId}
+                  items={[
+                    { value: "global", label: "Global (all members)" },
+                    ...teams.map((t) => ({ value: t.id, label: t.name })),
+                  ]}
+                  onValueChange={(v) => {
+                    setTeamId(v ?? "global");
+                    setAssigneeId("everyone");
+                  }}
+                >
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -88,9 +107,47 @@ export function CreateTaskDialog({
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label>Assign to</Label>
+                <Select
+                  value={assigneeId}
+                  items={[
+                    { value: "everyone", label: "Whole team" },
+                    ...teamMembers.map((m) => ({ value: m.member_id, label: m.full_name })),
+                  ]}
+                  onValueChange={(v) => v && setAssigneeId(v)}
+                  disabled={teamId === "global"}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="everyone">Whole team</SelectItem>
+                    {teamMembers.map((m) => (
+                      <SelectItem key={m.member_id} value={m.member_id}>
+                        {m.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {teamId === "global" ? (
+                  <p className="text-xs text-muted-foreground">
+                    Pick a team to assign a specific member instead of everyone.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
                 <Label>Task type</Label>
                 <Select
                   value={taskTypeId}
+                  items={[
+                    { value: "none", label: "Untyped" },
+                    ...taskTypes.map((t) => ({
+                      value: t.id,
+                      label: `${t.name} (${t.default_points} pts)`,
+                    })),
+                  ]}
                   onValueChange={(v) => {
                     if (v === null) return;
                     setTaskTypeId(v);
@@ -98,7 +155,7 @@ export function CreateTaskDialog({
                     if (tt) setPoints(String(tt.default_points));
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -111,8 +168,6 @@ export function CreateTaskDialog({
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="points">Points</Label>
                 <Input
@@ -124,10 +179,10 @@ export function CreateTaskDialog({
                   onChange={(e) => setPoints(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="dueDate">Due date</Label>
-                <Input id="dueDate" name="dueDate" type="date" />
-              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dueDate">Due date</Label>
+              <Input id="dueDate" name="dueDate" type="date" />
             </div>
             {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
           </div>

@@ -31,8 +31,8 @@ function RoleCard({
 
 export function Organogram({ data }: { data: OrganogramData }) {
   return (
-    <div className="overflow-x-auto pb-4">
-      <div className="flex min-w-max flex-col items-center">
+    <div className="w-full min-w-0 overflow-x-auto pb-4">
+      <div className="flex w-max min-w-full flex-col items-center">
         {/* Tier 1: fixed Core Team roles */}
         <div className="flex flex-wrap justify-center gap-4">
           {data.fixedRoles.map((r) => (

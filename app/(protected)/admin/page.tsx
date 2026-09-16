@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { useTeams, useTeamMembers, useAllMembers } from "@/lib/data/teams";
 import { useSuperAdmins } from "@/lib/data/admin";
+import { useTaskTypes } from "@/lib/data/tasks";
 import {
   Card,
   CardContent,
@@ -25,6 +26,8 @@ import { BulkImportMembersDialog } from "@/components/admin/bulk-import-dialog";
 import { CoreRoleSelect } from "@/components/admin/core-role-form";
 import { SuperAdminManager } from "@/components/admin/super-admin-manager";
 import { SyncTeamsButton } from "@/components/admin/sync-teams-button";
+import { TaskTypeManager } from "@/components/admin/task-type-manager";
+import { MemberRolesTable } from "@/components/admin/member-roles-table";
 
 export default function AdminPage() {
   const { data: user } = useCurrentUser();
@@ -34,11 +37,11 @@ export default function AdminPage() {
   const { data: coreMembers = [] } = useTeamMembers(coreTeam?.id ?? "");
   const { data: allMembers = [] } = useAllMembers();
   const { data: superAdmins = [] } = useSuperAdmins();
+  const { data: taskTypes = [] } = useTaskTypes();
   if (!user?.isSuperAdmin) return null;
 
-  const adminCandidates = allMembers.filter(
-    (m) => !superAdmins.some((a) => a.member_id === m.id),
-  );
+  const superAdminIds = new Set(superAdmins.map((a) => a.member_id));
+  const coreRoleByMemberId = new Map(coreMembers.map((m) => [m.member_id, m.core_role]));
 
   return (
     <div className="space-y-8 p-4 sm:p-6 lg:p-8">
@@ -150,7 +153,20 @@ export default function AdminPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <SuperAdminManager admins={superAdmins} candidates={adminCandidates} />
+          <SuperAdminManager admins={superAdmins} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Task types</CardTitle>
+          <CardDescription>
+            Configure the point weightage for each task type. Picking a type
+            when creating a task fills in its default points automatically.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TaskTypeManager taskTypes={taskTypes} />
         </CardContent>
       </Card>
 
@@ -219,20 +235,23 @@ export default function AdminPage() {
               </div>
             </>
           )}
-          <div className="mt-4">
-            <p className="mb-2 text-sm font-medium">Assign a fixed core role to any member</p>
-            <div className="flex flex-wrap gap-2">
-              {allMembers
-                .filter((m) => !coreMembers.some((cm) => cm.member_id === m.id))
-                .slice(0, 20)
-                .map((m) => (
-                  <div key={m.id} className="flex items-center gap-2 rounded-md border p-2">
-                    <span className="text-sm">{m.full_name}</span>
-                    <CoreRoleSelect memberId={m.id} currentRole={null} />
-                  </div>
-                ))}
-            </div>
-          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>All members ({allMembers.length})</CardTitle>
+          <CardDescription>
+            Search the full roster to grant/revoke Super Admin access or
+            assign a fixed Core Team role to anyone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <MemberRolesTable
+            members={allMembers}
+            superAdminIds={superAdminIds}
+            coreRoleByMemberId={coreRoleByMemberId}
+          />
         </CardContent>
       </Card>
     </div>

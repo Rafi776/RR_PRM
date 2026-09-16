@@ -86,7 +86,8 @@ export default function TasksPage() {
                       {statusBadge(t.my_status)}
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {t.team_name ?? "Global"} · {t.points} pts
+                      {t.team_name ?? "Global"}
+                      {t.assignee_name ? ` · ${t.assignee_name}` : ""} · {t.points} pts
                       {t.due_date ? ` · Due ${new Date(t.due_date).toLocaleDateString()}` : ""}
                     </p>
                   </Link>
@@ -100,6 +101,7 @@ export default function TasksPage() {
                     <TableRow>
                       <TableHead>Title</TableHead>
                       <TableHead>Team</TableHead>
+                      <TableHead>Assignee</TableHead>
                       <TableHead>Points</TableHead>
                       <TableHead>Due</TableHead>
                       <TableHead>My status</TableHead>
@@ -114,6 +116,7 @@ export default function TasksPage() {
                           </Link>
                         </TableCell>
                         <TableCell>{t.team_name ?? <span className="text-muted-foreground">Global</span>}</TableCell>
+                        <TableCell>{t.assignee_name ?? <span className="text-muted-foreground">Everyone</span>}</TableCell>
                         <TableCell>{t.points}</TableCell>
                         <TableCell>
                           {t.due_date ? new Date(t.due_date).toLocaleDateString() : "—"}

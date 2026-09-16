@@ -22,7 +22,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
           <SidebarNav isSuperAdmin={user.isSuperAdmin} />
         </div>
       </aside>
-      <div className="flex min-h-screen flex-col">
+      <div className="flex min-h-screen min-w-0 flex-col">
         <header
           className="sticky z-40 flex items-center justify-between gap-2 border-b bg-card/95 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-card/75 sm:px-6"
           style={{ top: "env(safe-area-inset-top, 0px)" }}
@@ -42,7 +42,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
             roles={user.roles}
           />
         </header>
-        <main className="flex-1 bg-background">{children}</main>
+        <main className="min-w-0 flex-1 bg-background">{children}</main>
       </div>
     </div>
   );

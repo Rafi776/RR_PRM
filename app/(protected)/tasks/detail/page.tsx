@@ -72,6 +72,7 @@ function TaskDetailInner() {
         </div>
         <p className="text-muted-foreground">
           {task.team_name ?? "Global task"}
+          {task.assignee_name ? ` · Assigned to ${task.assignee_name}` : ""}
           {task.due_date ? ` · Due ${new Date(task.due_date).toLocaleDateString()}` : ""}
         </p>
         {task.description ? <p className="mt-3 whitespace-pre-wrap">{task.description}</p> : null}

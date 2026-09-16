@@ -55,6 +55,7 @@ export function AttendanceChecklist({
     ) : (
       <Select
         value={statuses[memberId]}
+        items={STATUSES.map((s) => ({ value: s, label: s }))}
         onValueChange={(v) => {
           if (v === null) return;
           setStatuses((prev) => ({ ...prev, [memberId]: v as AttendanceStatus }));

@@ -86,7 +86,14 @@ export function EditMemberDialog({ member }: { member: TeamMemberRow }) {
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
-              <Select value={status} onValueChange={(v) => v && setStatus(v)}>
+              <Select
+                value={status}
+                items={[
+                  { value: "active", label: "Active" },
+                  { value: "inactive", label: "Inactive" },
+                ]}
+                onValueChange={(v) => v && setStatus(v)}
+              >
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>

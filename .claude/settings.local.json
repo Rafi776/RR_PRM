@@ -12,7 +12,9 @@
       "Bash(curl -s -o /dev/null -w \"login: %{http_code}\\\\n\" http://localhost:3001/login/)",
       "Bash(curl -s -o /dev/null -w \"dashboard: %{http_code}\\\\n\" http://localhost:3001/dashboard/)",
       "Bash(curl -s http://localhost:3001/login/)",
-      "Bash(pkill -f \"serve out\")"
+      "Bash(pkill -f \"serve out\")",
+      "Bash(gh run *)",
+      "Bash(curl -s 'https://dwfawfqxkswpvllhwspr.supabase.co/rest/v1/prm_members?select=blocked_at&limit=1' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3ZmF3ZnF4a3N3cHZsbGh3c3ByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NTY3NzEsImV4cCI6MjEwNTEzMjc3MX0.VZdDJbzqG2cHtY5GaLpC1wHivJnXreVxUAqrSctnC54')"
     ],
     "additionalDirectories": [
       "/Users/mdrakibulhasanrafi/Personal/prm/app/(protected)/tasks/[taskId]",

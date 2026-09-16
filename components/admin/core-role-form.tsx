@@ -37,6 +37,10 @@ export function CoreRoleSelect({
   return (
     <Select
       defaultValue={currentRole ?? "none"}
+      items={[
+        { value: "none", label: "No fixed role" },
+        ...CORE_ROLES.map((role) => ({ value: role, label: role })),
+      ]}
       onValueChange={(value) => {
         if (value === null) return;
         const fd = new FormData();

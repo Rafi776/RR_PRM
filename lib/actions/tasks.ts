@@ -8,7 +8,18 @@ async function seedMemberStatusesForTask(
   supabase: ReturnType<typeof createClient>,
   taskId: string,
   teamId: string | null,
+  assigneeId: string | null,
 ) {
+  // Assigned to one specific member: seed just that row, regardless of
+  // team size.
+  if (assigneeId) {
+    await supabase.from("task_member_status").upsert(
+      { task_id: taskId, member_id: assigneeId, status: "not_submitted" },
+      { onConflict: "task_id,member_id", ignoreDuplicates: true },
+    );
+    return;
+  }
+
   if (!teamId) return; // global task: members opt in by submitting directly
   const { data: members } = await supabase
     .from("team_memberships")
@@ -33,6 +44,7 @@ export async function createTask(
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const teamId = String(formData.get("teamId") ?? "") || null;
+  const assigneeId = String(formData.get("assigneeId") ?? "") || null;
   const taskTypeId = String(formData.get("taskTypeId") ?? "") || null;
   const points = Number(formData.get("points") ?? 0);
   const dueDate = String(formData.get("dueDate") ?? "") || null;
@@ -49,6 +61,7 @@ export async function createTask(
       title,
       description: description || null,
       team_id: teamId,
+      assignee_id: assigneeId,
       task_type_id: taskTypeId,
       points,
       due_date: dueDate,
@@ -59,7 +72,7 @@ export async function createTask(
 
   if (error) return { error: error.message };
 
-  await seedMemberStatusesForTask(supabase, created.id, teamId);
+  await seedMemberStatusesForTask(supabase, created.id, teamId, assigneeId);
 
   queryClient.invalidateQueries();
   return { error: null, success: `Task "${title}" created.` };
@@ -144,7 +157,7 @@ export async function bulkImportTasks(
       continue;
     }
 
-    await seedMemberStatusesForTask(supabase, created.id, team?.id ?? null);
+    await seedMemberStatusesForTask(supabase, created.id, team?.id ?? null, null);
     imported++;
   }
 

@@ -64,6 +64,7 @@ export function MemberFilters({
 
       <Select
         value={searchParams.get("team") ?? "all"}
+        items={[{ value: "all", label: "All teams" }, ...teams.map((t) => ({ value: t, label: t }))]}
         onValueChange={(v) => setParam("team", v)}
       >
         <SelectTrigger className="w-[160px]">
@@ -81,6 +82,7 @@ export function MemberFilters({
 
       <Select
         value={searchParams.get("stage") ?? "all"}
+        items={[{ value: "all", label: "All stages" }, ...stages.map((s) => ({ value: s, label: s }))]}
         onValueChange={(v) => setParam("stage", v)}
       >
         <SelectTrigger className="w-[160px]">
@@ -98,6 +100,10 @@ export function MemberFilters({
 
       <Select
         value={searchParams.get("district") ?? "all"}
+        items={[
+          { value: "all", label: "All districts" },
+          ...districts.map((d) => ({ value: d, label: d })),
+        ]}
         onValueChange={(v) => setParam("district", v)}
       >
         <SelectTrigger className="w-[160px]">
@@ -115,6 +121,11 @@ export function MemberFilters({
 
       <Select
         value={searchParams.get("status") ?? "all"}
+        items={[
+          { value: "all", label: "All statuses" },
+          { value: "active", label: "Active" },
+          { value: "inactive", label: "Inactive" },
+        ]}
         onValueChange={(v) => setParam("status", v)}
       >
         <SelectTrigger className="w-[140px]">

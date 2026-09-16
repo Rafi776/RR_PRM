@@ -9,6 +9,7 @@ export type TaskListRow = {
   title: string;
   team_id: string | null;
   team_name: string | null;
+  assignee_name: string | null;
   points: number;
   due_date: string | null;
   my_status: TaskStatus | null;
@@ -19,7 +20,7 @@ export async function listTasksForUser(memberId: string): Promise<TaskListRow[]>
   const { data, error } = await supabase
     .from("team_tasks")
     .select(
-      "id, title, points, due_date, team_id, teams(name), task_member_status(status, member_id)",
+      "id, title, points, due_date, team_id, teams(name), assignee:prm_members!team_tasks_assignee_id_fkey(full_name), task_member_status(status, member_id)",
     )
     .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
@@ -28,6 +29,8 @@ export async function listTasksForUser(memberId: string): Promise<TaskListRow[]>
   return (data ?? []).map((t) => {
     const team = t.teams as { name: string } | { name: string }[] | null;
     const teamSingle = Array.isArray(team) ? team[0] : team;
+    const assignee = t.assignee as { full_name: string } | { full_name: string }[] | null;
+    const assigneeSingle = Array.isArray(assignee) ? assignee[0] : assignee;
     const statuses = (t.task_member_status ?? []) as {
       status: TaskStatus;
       member_id: string;
@@ -38,6 +41,7 @@ export async function listTasksForUser(memberId: string): Promise<TaskListRow[]>
       title: t.title,
       team_id: t.team_id,
       team_name: teamSingle?.name ?? null,
+      assignee_name: assigneeSingle?.full_name ?? null,
       points: t.points,
       due_date: t.due_date,
       my_status: mine?.status ?? null,
@@ -59,13 +63,17 @@ export async function getTaskDetail(taskId: string) {
   const supabase = createClient();
   const { data: task, error } = await supabase
     .from("team_tasks")
-    .select("id, title, description, points, due_date, team_id, teams(name)")
+    .select(
+      "id, title, description, points, due_date, team_id, teams(name), assignee:prm_members!team_tasks_assignee_id_fkey(full_name)",
+    )
     .eq("id", taskId)
     .single();
   if (error) throw error;
 
   const team = task.teams as { name: string } | { name: string }[] | null;
   const teamSingle = Array.isArray(team) ? team[0] : team;
+  const assignee = task.assignee as { full_name: string } | { full_name: string }[] | null;
+  const assigneeSingle = Array.isArray(assignee) ? assignee[0] : assignee;
 
   const [{ data: statuses }, { data: comments }, { data: attachments }] = await Promise.all([
     supabase
@@ -85,7 +93,7 @@ export async function getTaskDetail(taskId: string) {
   ]);
 
   return {
-    task: { ...task, team_name: teamSingle?.name ?? null },
+    task: { ...task, team_name: teamSingle?.name ?? null, assignee_name: assigneeSingle?.full_name ?? null },
     statuses: (statuses ?? []).map((s) => {
       const pm = s.prm_members as
         | { full_name: string; email: string }

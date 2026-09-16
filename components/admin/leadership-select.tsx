@@ -29,6 +29,10 @@ export function LeadershipSelect({
   return (
     <Select
       defaultValue={currentMemberId ?? "none"}
+      items={[
+        { value: "none", label: "Unassigned" },
+        ...members.map((m) => ({ value: m.id, label: m.full_name })),
+      ]}
       onValueChange={(value) => {
         if (value === null || value === "none") return;
         const fd = new FormData();

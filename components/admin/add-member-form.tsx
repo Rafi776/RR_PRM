@@ -37,7 +37,11 @@ export function AddMemberForm({
     <form action={formAction} className="flex items-center gap-2">
       <input type="hidden" name="teamId" value={teamId} />
       <input type="hidden" name="memberId" value={selected} />
-      <Select value={selected} onValueChange={(value) => setSelected(value ?? "")}>
+      <Select
+        value={selected}
+        items={candidates.map((c) => ({ value: c.id, label: `${c.full_name} (${c.email})` }))}
+        onValueChange={(value) => setSelected(value ?? "")}
+      >
         <SelectTrigger className="h-9 w-[260px]">
           <SelectValue placeholder="Select a member to add" />
         </SelectTrigger>

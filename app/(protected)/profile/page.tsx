@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PhotoUpload } from "@/components/profile/photo-upload";
-import { PhoneForm } from "@/components/profile/phone-form";
+import { EditProfileForm } from "@/components/profile/edit-profile-form";
+import { ChangePasswordForm } from "@/components/profile/change-password-form";
 
 function Field({ label, value }: { label: string; value: string | null }) {
   return (
@@ -32,7 +33,7 @@ export default function ProfilePage() {
       <div>
         <h1 className="text-2xl font-semibold">My Profile</h1>
         <p className="text-muted-foreground">
-          You can update your photo and phone number here. Other fields are
+          You can edit your details and password here. BS ID and email are
           managed by your Team Coordinator or an admin.
         </p>
       </div>
@@ -48,10 +49,21 @@ export default function ProfilePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Contact</CardTitle>
+          <CardTitle>Profile details</CardTitle>
+          <CardDescription>Editable by you.</CardDescription>
         </CardHeader>
         <CardContent>
-          <PhoneForm currentPhone={profile.phone} />
+          <EditProfileForm profile={profile} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Password</CardTitle>
+          <CardDescription>Change your account password.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChangePasswordForm />
         </CardContent>
       </Card>
 
@@ -61,14 +73,8 @@ export default function ProfilePage() {
           <CardDescription>Read-only — contact your Coordinator to correct these.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-          <Field label="Full name" value={profile.full_name} />
           <Field label="Email" value={profile.email} />
           <Field label="BS ID" value={profile.bs_id} />
-          <Field label="Stage" value={profile.stage} />
-          <Field label="Scout Group" value={profile.scout_group} />
-          <Field label="District" value={profile.district} />
-          <Field label="Team" value={profile.team_name} />
-          <Field label="Position" value={profile.position} />
           <div>
             <p className="text-xs font-medium text-muted-foreground">Status</p>
             <Badge variant={profile.status === "active" ? "default" : "secondary"}>

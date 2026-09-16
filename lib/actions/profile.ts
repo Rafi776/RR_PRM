@@ -3,11 +3,11 @@ import { fetchCurrentUser } from "@/lib/hooks/use-current-user";
 import { queryClient } from "@/lib/query-client";
 import type { ActionResult } from "@/lib/actions/teams";
 
-// Self-service only: a member may update their own phone and photo.
-// Every other column on prm_members is locked down for self-updates by
-// the `restrict_self_member_update` DB trigger (0005) regardless of
-// what this action sends — this check is a fast-path UX guard, not the
-// actual security boundary.
+// Self-service: a member may update their own profile — everything
+// except bs_id, email, status, and the blocked_* audit columns, which
+// the `restrict_self_member_update` DB trigger (0008) locks down for
+// self-updates regardless of what this action sends. That trigger is
+// the actual security boundary; the checks here are just fast-path UX.
 
 export async function uploadProfilePhoto(
   _prev: ActionResult,
@@ -111,22 +111,58 @@ export async function setMemberPhoto(
   return { error: null, success: "Photo updated." };
 }
 
-export async function updateOwnPhone(
+export async function updateOwnProfile(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
   const user = await fetchCurrentUser();
   if (!user) return { error: "Not authenticated." };
 
+  const fullName = String(formData.get("fullName") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
+  const stage = String(formData.get("stage") ?? "").trim();
+  const scoutGroup = String(formData.get("scoutGroup") ?? "").trim();
+  const district = String(formData.get("district") ?? "").trim();
+  const teamName = String(formData.get("teamName") ?? "").trim();
+  const position = String(formData.get("position") ?? "").trim();
+
+  if (!fullName) return { error: "Name is required." };
 
   const supabase = createClient();
   const { error } = await supabase
     .from("prm_members")
-    .update({ phone: phone || null })
+    .update({
+      full_name: fullName,
+      phone: phone || null,
+      stage: stage || null,
+      scout_group: scoutGroup || null,
+      district: district || null,
+      team_name: teamName || null,
+      position: position || null,
+    })
     .eq("id", user.id);
   if (error) return { error: error.message };
 
   queryClient.invalidateQueries();
-  return { error: null, success: "Phone number updated." };
+  return { error: null, success: "Profile updated." };
+}
+
+export async function changeOwnPassword(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const user = await fetchCurrentUser();
+  if (!user) return { error: "Not authenticated." };
+
+  const newPassword = String(formData.get("newPassword") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  if (newPassword.length < 8) return { error: "Password must be at least 8 characters." };
+  if (newPassword !== confirmPassword) return { error: "Passwords don't match." };
+
+  const supabase = createClient();
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) return { error: error.message };
+
+  return { error: null, success: "Password changed." };
 }

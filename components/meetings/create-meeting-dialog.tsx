@@ -54,7 +54,7 @@ export function CreateMeetingDialog({
         Log meeting
       </DialogTrigger>
       <DialogContent>
-        <form action={formAction} encType="multipart/form-data">
+        <form action={formAction}>
           <DialogHeader>
             <DialogTitle>Log meeting minutes</DialogTitle>
           </DialogHeader>
@@ -63,9 +63,13 @@ export function CreateMeetingDialog({
               <Label>Scope</Label>
               <Select
                 value={scope}
+                items={[
+                  { value: "team", label: "Team Meeting" },
+                  ...(isCoreTeam ? [{ value: "central_core", label: "Central Core Meeting" }] : []),
+                ]}
                 onValueChange={(v) => v && setScope(v as typeof scope)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -80,8 +84,12 @@ export function CreateMeetingDialog({
             {scope === "team" ? (
               <div className="space-y-2">
                 <Label>Team</Label>
-                <Select value={teamId} onValueChange={(v) => setTeamId(v ?? "")}>
-                  <SelectTrigger>
+                <Select
+                  value={teamId}
+                  items={teams.map((t) => ({ value: t.id, label: t.name }))}
+                  onValueChange={(v) => setTeamId(v ?? "")}
+                >
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
