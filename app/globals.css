@@ -1,0 +1,164 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * Brand palette: violet primary + teal accent, with dedicated
+ * success/warning tones (Badge component maps these to explicit
+ * variants). Chart hues are spread across the wheel for a colorful,
+ * distinguishable set when used in leaderboards/reports.
+ */
+:root {
+  --background: oklch(0.99 0.004 290);
+  --foreground: oklch(0.2 0.03 290);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.03 290);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.03 290);
+  --primary: oklch(0.55 0.22 291);
+  --primary-foreground: oklch(0.99 0.005 290);
+  --secondary: oklch(0.95 0.025 291);
+  --secondary-foreground: oklch(0.32 0.1 291);
+  --muted: oklch(0.96 0.012 291);
+  --muted-foreground: oklch(0.5 0.03 291);
+  --accent: oklch(0.93 0.06 185);
+  --accent-foreground: oklch(0.25 0.07 185);
+  --destructive: oklch(0.6 0.24 25);
+  --success: oklch(0.62 0.16 155);
+  --success-foreground: oklch(0.99 0.01 155);
+  --warning: oklch(0.78 0.16 75);
+  --warning-foreground: oklch(0.25 0.06 75);
+  --border: oklch(0.9 0.015 291);
+  --input: oklch(0.9 0.015 291);
+  --ring: oklch(0.6 0.2 291);
+  --chart-1: oklch(0.62 0.22 291);
+  --chart-2: oklch(0.7 0.15 180);
+  --chart-3: oklch(0.76 0.17 70);
+  --chart-4: oklch(0.64 0.23 25);
+  --chart-5: oklch(0.68 0.16 230);
+  --radius: 0.75rem;
+  --sidebar: oklch(0.24 0.07 291);
+  --sidebar-foreground: oklch(0.95 0.015 291);
+  --sidebar-primary: oklch(0.68 0.2 291);
+  --sidebar-primary-foreground: oklch(0.99 0.005 291);
+  --sidebar-accent: oklch(0.32 0.09 291);
+  --sidebar-accent-foreground: oklch(0.98 0.01 291);
+  --sidebar-border: oklch(0.34 0.08 291);
+  --sidebar-ring: oklch(0.68 0.2 291);
+}
+
+.dark {
+  --background: oklch(0.17 0.018 291);
+  --foreground: oklch(0.96 0.012 291);
+  --card: oklch(0.21 0.022 291);
+  --card-foreground: oklch(0.96 0.012 291);
+  --popover: oklch(0.21 0.022 291);
+  --popover-foreground: oklch(0.96 0.012 291);
+  --primary: oklch(0.72 0.19 291);
+  --primary-foreground: oklch(0.16 0.02 291);
+  --secondary: oklch(0.29 0.03 291);
+  --secondary-foreground: oklch(0.96 0.012 291);
+  --muted: oklch(0.26 0.02 291);
+  --muted-foreground: oklch(0.7 0.02 291);
+  --accent: oklch(0.3 0.06 185);
+  --accent-foreground: oklch(0.93 0.03 185);
+  --destructive: oklch(0.66 0.22 25);
+  --success: oklch(0.68 0.15 155);
+  --success-foreground: oklch(0.14 0.03 155);
+  --warning: oklch(0.78 0.15 80);
+  --warning-foreground: oklch(0.2 0.05 80);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.68 0.19 291);
+  --chart-1: oklch(0.68 0.2 291);
+  --chart-2: oklch(0.72 0.14 180);
+  --chart-3: oklch(0.78 0.16 70);
+  --chart-4: oklch(0.68 0.21 25);
+  --chart-5: oklch(0.72 0.15 230);
+  --sidebar: oklch(0.13 0.02 291);
+  --sidebar-foreground: oklch(0.95 0.012 291);
+  --sidebar-primary: oklch(0.72 0.19 291);
+  --sidebar-primary-foreground: oklch(0.14 0.02 291);
+  --sidebar-accent: oklch(0.21 0.03 291);
+  --sidebar-accent-foreground: oklch(0.96 0.012 291);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.72 0.19 291);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+    /* Prevent iOS zoom-on-focus for inputs under 16px, and let the
+       safe-area padding on :root apply consistently across pages. */
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+@layer utilities {
+  /* Subtle brand gradient used for page headers / hero surfaces to keep
+     the "colorful" identity consistent without overusing solid fills. */
+  .brand-gradient {
+    background-image: linear-gradient(
+      135deg,
+      oklch(0.55 0.22 291) 0%,
+      oklch(0.6 0.18 260) 45%,
+      oklch(0.62 0.16 185) 100%
+    );
+  }
+}
