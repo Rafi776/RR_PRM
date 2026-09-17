@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { CreateTeamDialog } from "@/components/admin/create-team-dialog";
 import { BulkImportMembersDialog } from "@/components/admin/bulk-import-dialog";
+import { InviteExistingMemberDialog } from "@/components/admin/invite-existing-member-dialog";
 import { CoreRoleSelect } from "@/components/admin/core-role-form";
 import { SuperAdminManager } from "@/components/admin/super-admin-manager";
 import { SyncTeamsButton } from "@/components/admin/sync-teams-button";
@@ -55,6 +56,7 @@ export default function AdminPage() {
         <div className="flex flex-wrap gap-2">
           <SyncTeamsButton />
           <BulkImportMembersDialog />
+          <InviteExistingMemberDialog />
           <CreateTeamDialog />
         </div>
       </div>

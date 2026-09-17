@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { CreateTaskDialog } from "@/components/tasks/create-task-dialog";
 import { BulkImportTasksDialog } from "@/components/tasks/bulk-import-dialog";
+import { DeleteTaskButton } from "@/components/tasks/delete-task-button";
 import type { TaskStatus } from "@/lib/types/domain";
 
 function statusBadge(status: TaskStatus | null) {
@@ -39,7 +40,7 @@ function statusBadge(status: TaskStatus | null) {
 
 export default function TasksPage() {
   const { data: user } = useCurrentUser();
-  const { data: tasks = [] } = useTasksForUser(user?.id);
+  const { data: tasks = [] } = useTasksForUser(user?.memberId);
   const { data: teams = [] } = useTeams();
   const { data: taskTypes = [] } = useTaskTypes();
   if (!user) return null;
@@ -49,6 +50,9 @@ export default function TasksPage() {
   const manageableTeams = user.isSuperAdmin
     ? teams.filter((t) => !t.is_core_team)
     : teams.filter((t) => user.leadershipTeamIds.includes(t.id));
+
+  const canDeleteTask = (teamId: string | null) =>
+    user.isSuperAdmin || (teamId !== null && user.leadershipTeamIds.includes(teamId));
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -80,16 +84,25 @@ export default function TasksPage() {
               {/* Mobile: card list */}
               <div className="divide-y rounded-lg border sm:hidden">
                 {tasks.map((t) => (
-                  <Link key={t.id} href={`/tasks/detail?id=${t.id}`} className="block p-3 active:bg-muted">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-medium text-primary">{t.title}</p>
-                      {statusBadge(t.my_status)}
+                  <Link
+                    key={t.id}
+                    href={`/tasks/detail?id=${t.id}`}
+                    className="flex items-start gap-2 p-3 active:bg-muted"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-medium text-primary">{t.title}</p>
+                        {statusBadge(t.my_status)}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t.team_name ?? "Global"}
+                        {t.assignee_name ? ` · ${t.assignee_name}` : ""} · {t.points} pts
+                        {t.due_date ? ` · Due ${new Date(t.due_date).toLocaleDateString()}` : ""}
+                      </p>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t.team_name ?? "Global"}
-                      {t.assignee_name ? ` · ${t.assignee_name}` : ""} · {t.points} pts
-                      {t.due_date ? ` · Due ${new Date(t.due_date).toLocaleDateString()}` : ""}
-                    </p>
+                    {canDeleteTask(t.team_id) ? (
+                      <DeleteTaskButton taskId={t.id} taskTitle={t.title} />
+                    ) : null}
                   </Link>
                 ))}
               </div>
@@ -105,6 +118,7 @@ export default function TasksPage() {
                       <TableHead>Points</TableHead>
                       <TableHead>Due</TableHead>
                       <TableHead>My status</TableHead>
+                      {canManage ? <TableHead className="text-right">Actions</TableHead> : null}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -122,6 +136,13 @@ export default function TasksPage() {
                           {t.due_date ? new Date(t.due_date).toLocaleDateString() : "—"}
                         </TableCell>
                         <TableCell>{statusBadge(t.my_status)}</TableCell>
+                        {canManage ? (
+                          <TableCell className="text-right">
+                            {canDeleteTask(t.team_id) ? (
+                              <DeleteTaskButton taskId={t.id} taskTitle={t.title} />
+                            ) : null}
+                          </TableCell>
+                        ) : null}
                       </TableRow>
                     ))}
                   </TableBody>

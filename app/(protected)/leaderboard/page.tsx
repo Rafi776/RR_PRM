@@ -166,7 +166,7 @@ function LeaderboardPageInner() {
               <LeaderboardRows
                 rows={global}
                 rank={(row) => (row as PerformanceRow).global_rank}
-                currentUserId={user.id}
+                currentUserId={user.memberId}
                 emptyMessage="No scores yet."
               />
             </CardContent>
@@ -199,7 +199,7 @@ function LeaderboardPageInner() {
               <LeaderboardRows
                 rows={teamRows}
                 rank={(row) => (row as TeamPerformanceRow).team_rank}
-                currentUserId={user.id}
+                currentUserId={user.memberId}
                 emptyMessage="No scores yet for this team."
               />
             </CardContent>

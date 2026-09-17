@@ -8,6 +8,7 @@ import {
   useMembersDirectory,
   useMemberDirectoryFilterOptions,
 } from "@/lib/data/members";
+import { useNocStatusByMember } from "@/lib/data/noc";
 import {
   Card,
   CardContent,
@@ -33,6 +34,7 @@ function MembersPageInner() {
   const { data: organogram } = useOrganogram();
   const { data: filterOptions } = useMemberDirectoryFilterOptions();
   const { data: members = [] } = useMembersDirectory(filters);
+  const { data: nocStatusByMember = {} } = useNocStatusByMember(!!user);
 
   if (!user || !organogram || !filterOptions) return null;
 
@@ -73,9 +75,10 @@ function MembersPageInner() {
           />
           <MemberDirectoryTable
             members={members}
-            currentUserId={user.id}
+            currentUserId={user.memberId}
             canManage={canManage}
             isSuperAdmin={user.isSuperAdmin}
+            nocStatusByMember={nocStatusByMember}
           />
         </CardContent>
       </Card>

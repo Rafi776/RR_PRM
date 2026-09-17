@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
 
   const authResult = await requireSuperAdmin(req);
   if (authResult instanceof Response) return authResult;
-  const { userId } = authResult;
+  const { userId, organizationId } = authResult;
 
   const { rows, redirectOrigin } = (await req.json()) as {
     rows: Row[];
@@ -59,7 +59,16 @@ Deno.serve(async (req) => {
   const recoveryRedirectTo = `${redirectOrigin}/auth/callback?redirectTo=/auth/set-password`;
   const admin = adminClient();
 
-  const { data: existingRows } = await admin.from("prm_members").select("email");
+  // Scoped to this org only — a different org can reuse an email that's
+  // already a member elsewhere in prm_members (uniqueness is now
+  // per-organization, see 0012). Note Supabase Auth itself still
+  // enforces one email per project across all of auth.users, independent
+  // of this check — createUser below will fail on a truly global
+  // duplicate, which is a platform limit, not a bug.
+  const { data: existingRows } = await admin
+    .from("prm_members")
+    .select("email")
+    .eq("organization_id", organizationId);
   const existingEmails = new Set(
     (existingRows ?? []).map((r: { email: string }) => r.email.toLowerCase()),
   );
@@ -81,15 +90,21 @@ Deno.serve(async (req) => {
       email_confirm: true,
     });
     if (createError || !created?.user) {
+      const alreadyExists = /already been registered|already exists/i.test(
+        createError?.message ?? "",
+      );
       return {
         kind: "skip",
         row: i + 2,
-        reason: createError?.message ?? "Account creation failed.",
+        reason: alreadyExists
+          ? `This email is already used by an account in another organization on this platform — emails must be globally unique across all orgs.`
+          : (createError?.message ?? "Account creation failed."),
       };
     }
 
     const { error: insertError } = await admin.from("prm_members").insert({
-      id: created.user.id,
+      user_id: created.user.id,
+      organization_id: organizationId,
       full_name: fullName,
       email,
       phone: row.phone?.trim() || null,

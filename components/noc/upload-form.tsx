@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useId, useRef } from "react";
 import { toast } from "sonner";
-import { uploadNoc } from "@/lib/actions/noc";
+import { uploadNocs } from "@/lib/actions/noc";
 import type { ActionResult } from "@/lib/actions/teams";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,27 +10,58 @@ import { Label } from "@/components/ui/label";
 
 const initial: ActionResult = { error: null };
 
-export function NocUploadForm() {
-  const [state, formAction, pending] = useActionState(uploadNoc, initial);
+// A member uploads both a District NOC and a Unit NOC — separate
+// documents, reviewed independently — but can supply either or both
+// in a single submit. A type already pending/approved is skipped
+// server-side rather than blocked here, so the same form still works
+// once one type needs re-uploading after a rejection.
+export function NocUploadForm({
+  districtLocked,
+  unitLocked,
+}: {
+  districtLocked: boolean;
+  unitLocked: boolean;
+}) {
+  const [state, formAction, pending] = useActionState(uploadNocs, initial);
   const formRef = useRef<HTMLFormElement>(null);
+  const districtId = useId();
+  const unitId = useId();
 
   useEffect(() => {
     if (state.success) {
       toast.success(state.success);
       formRef.current?.reset();
     }
-  }, [state.success]);
+    if (state.error) toast.error(state.error);
+  }, [state.success, state.error]);
 
   return (
-    <form ref={formRef} action={formAction} className="flex items-end gap-3">
-      <div className="space-y-2">
-        <Label htmlFor="noc-file">Upload NOC (PDF or image)</Label>
-        <Input id="noc-file" name="file" type="file" accept=".pdf,image/*" required />
+    <form ref={formRef} action={formAction} className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor={districtId}>District NOC (PDF or image)</Label>
+          <Input
+            id={districtId}
+            name="districtFile"
+            type="file"
+            accept=".pdf,image/*"
+            disabled={districtLocked}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={unitId}>Unit NOC (PDF or image)</Label>
+          <Input
+            id={unitId}
+            name="unitFile"
+            type="file"
+            accept=".pdf,image/*"
+            disabled={unitLocked}
+          />
+        </div>
       </div>
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" disabled={pending || (districtLocked && unitLocked)}>
         {pending ? "Uploading..." : "Upload"}
       </Button>
-      {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
     </form>
   );
 }

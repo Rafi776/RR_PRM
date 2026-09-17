@@ -25,7 +25,7 @@ function Field({ label, value }: { label: string; value: string | null }) {
 
 export default function ProfilePage() {
   const { data: user } = useCurrentUser();
-  const { data: profile } = useOwnProfile(user?.id);
+  const { data: profile } = useOwnProfile(user?.memberId);
   if (!user || !profile) return null;
 
   return (

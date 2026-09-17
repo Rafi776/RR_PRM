@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { bulkImportMembers, type BulkImportResult } from "@/lib/actions/teams";
+import { downloadExampleCsv } from "@/lib/utils/download-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Upload, Download } from "lucide-react";
+import { Upload, Download, FileDown } from "lucide-react";
 
 const initial: BulkImportResult = { error: null, imported: 0, skipped: [], setupLinks: [] };
 
@@ -61,6 +62,44 @@ export function BulkImportMembersDialog() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="text-primary"
+              onClick={() =>
+                downloadExampleCsv(
+                  "member-import-example.csv",
+                  [
+                    "name",
+                    "email",
+                    "phone",
+                    "bs_id",
+                    "stage",
+                    "scout_group",
+                    "district",
+                    "team_name",
+                    "position",
+                    "photo",
+                  ],
+                  [
+                    "Jane Doe",
+                    "jane.doe@example.com",
+                    "+8801XXXXXXXXX",
+                    "BS12345",
+                    "Rover",
+                    "1st Example Group",
+                    "Dhaka",
+                    "Social Media",
+                    "Member",
+                    "",
+                  ],
+                )
+              }
+            >
+              <FileDown className="mr-1 h-4 w-4" />
+              Download example file
+            </Button>
             <div className="space-y-2">
               <Label htmlFor="file">CSV or Excel file</Label>
               <Input

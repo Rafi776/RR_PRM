@@ -7,6 +7,7 @@ import { parseTabularFile } from "@/lib/utils/parse-tabular";
 async function seedMemberStatusesForTask(
   supabase: ReturnType<typeof createClient>,
   taskId: string,
+  organizationId: string,
   teamId: string | null,
   assigneeId: string | null,
 ) {
@@ -14,7 +15,7 @@ async function seedMemberStatusesForTask(
   // team size.
   if (assigneeId) {
     await supabase.from("task_member_status").upsert(
-      { task_id: taskId, member_id: assigneeId, status: "not_submitted" },
+      { task_id: taskId, member_id: assigneeId, organization_id: organizationId, status: "not_submitted" },
       { onConflict: "task_id,member_id", ignoreDuplicates: true },
     );
     return;
@@ -29,7 +30,12 @@ async function seedMemberStatusesForTask(
   if (!members?.length) return;
 
   await supabase.from("task_member_status").upsert(
-    members.map((m) => ({ task_id: taskId, member_id: m.member_id, status: "not_submitted" })),
+    members.map((m) => ({
+      task_id: taskId,
+      member_id: m.member_id,
+      organization_id: organizationId,
+      status: "not_submitted",
+    })),
     { onConflict: "task_id,member_id", ignoreDuplicates: true },
   );
 }
@@ -63,6 +69,7 @@ export async function createTask(
       team_id: teamId,
       assignee_id: assigneeId,
       task_type_id: taskTypeId,
+      organization_id: user.organizationId,
       points,
       due_date: dueDate,
       created_by: user.id,
@@ -72,7 +79,7 @@ export async function createTask(
 
   if (error) return { error: error.message };
 
-  await seedMemberStatusesForTask(supabase, created.id, teamId, assigneeId);
+  await seedMemberStatusesForTask(supabase, created.id, user.organizationId, teamId, assigneeId);
 
   queryClient.invalidateQueries();
   return { error: null, success: `Task "${title}" created.` };
@@ -145,6 +152,7 @@ export async function bulkImportTasks(
         description: row.description?.trim() || null,
         team_id: team?.id ?? null,
         task_type_id: taskType?.id ?? null,
+        organization_id: user!.organizationId,
         points,
         due_date: row.due_date?.trim() || null,
         created_by: user!.id,
@@ -157,12 +165,26 @@ export async function bulkImportTasks(
       continue;
     }
 
-    await seedMemberStatusesForTask(supabase, created.id, team?.id ?? null, null);
+    await seedMemberStatusesForTask(supabase, created.id, user!.organizationId, team?.id ?? null, null);
     imported++;
   }
 
   queryClient.invalidateQueries();
   return { error: null, imported, skipped };
+}
+
+// RLS (team_tasks_modify_leadership_or_admin, 0002) restricts this to a
+// Super Admin, or a team's leadership for that team's own tasks — global
+// tasks (team_id null) can only be deleted by a Super Admin.
+export async function deleteTask(taskId: string): Promise<ActionResult> {
+  if (!taskId) return { error: "Missing task." };
+
+  const supabase = createClient();
+  const { error } = await supabase.from("team_tasks").delete().eq("id", taskId);
+  if (error) return { error: error.message };
+
+  queryClient.invalidateQueries();
+  return { error: null, success: "Task deleted." };
 }
 
 export async function submitTask(
@@ -180,7 +202,8 @@ export async function submitTask(
   const { error } = await supabase.from("task_member_status").upsert(
     {
       task_id: taskId,
-      member_id: user.id,
+      member_id: user.memberId,
+      organization_id: user.organizationId,
       status: "submitted",
       submission_url: submissionUrl || null,
       submitted_at: new Date().toISOString(),
@@ -233,7 +256,7 @@ export async function addTaskComment(
   const supabase = createClient();
   const { error } = await supabase
     .from("task_comments")
-    .insert({ task_id: taskId, member_id: user.id, comment });
+    .insert({ task_id: taskId, member_id: user.memberId, organization_id: user.organizationId, comment });
   if (error) return { error: error.message };
 
   queryClient.invalidateQueries();
@@ -254,7 +277,7 @@ export async function addTaskAttachment(
   }
 
   const supabase = createClient();
-  const path = `${taskId}/${user.id}/${Date.now()}-${file.name}`;
+  const path = `${taskId}/${user.memberId}/${Date.now()}-${file.name}`;
 
   const { error: uploadError } = await supabase.storage
     .from("task-attachments")
@@ -263,7 +286,8 @@ export async function addTaskAttachment(
 
   const { error: insertError } = await supabase.from("task_attachments").insert({
     task_id: taskId,
-    member_id: user.id,
+    member_id: user.memberId,
+    organization_id: user.organizationId,
     file_path: path,
     file_name: file.name,
   });

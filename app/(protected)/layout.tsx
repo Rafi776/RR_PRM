@@ -40,6 +40,9 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
             email={user.email}
             avatarUrl={user.avatarUrl}
             roles={user.roles}
+            organizationId={user.organizationId}
+            organizationName={user.organizationName}
+            availableOrganizations={user.availableOrganizations}
           />
         </header>
         <main className="min-w-0 flex-1 bg-background">{children}</main>

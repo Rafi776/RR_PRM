@@ -15,13 +15,14 @@ export async function fileReport(
   const details = String(formData.get("details") ?? "").trim();
 
   if (!reportedMemberId) return { error: "Missing member." };
-  if (reportedMemberId === user.id) return { error: "You can't report yourself." };
+  if (reportedMemberId === user.memberId) return { error: "You can't report yourself." };
   if (!reason) return { error: "A reason is required." };
 
   const supabase = createClient();
   const { error } = await supabase.from("member_reports").insert({
-    reporter_id: user.id,
+    reporter_id: user.memberId,
     reported_member_id: reportedMemberId,
+    organization_id: user.organizationId,
     reason,
     details: details || null,
   });

@@ -18,13 +18,20 @@ import { Badge } from "@/components/ui/badge";
 export default function DashboardPage() {
   const { data: user } = useCurrentUser();
   const { data: leaderboard = [] } = useGlobalLeaderboard();
-  const { data: tasks = [] } = useTasksForUser(user?.id);
-  const { data: nocs = [] } = useOwnNocs(user?.id);
+  const { data: tasks = [] } = useTasksForUser(user?.memberId);
+  const { data: nocs = [] } = useOwnNocs(user?.memberId);
   if (!user) return null;
 
-  const myRank = leaderboard.find((r) => r.member_id === user.id);
+  const myRank = leaderboard.find((r) => r.member_id === user.memberId);
   const pendingTasks = tasks.filter((t) => t.my_status === "not_submitted" || t.my_status === null);
-  const latestNoc = nocs[0];
+
+  const latestByType = (type: "district" | "unit") =>
+    nocs
+      .filter((n) => n.noc_type === type)
+      .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())[0];
+  const districtNoc = latestByType("district");
+  const unitNoc = latestByType("unit");
+  const nocsComplete = [districtNoc, unitNoc].filter((n) => n?.status === "approved").length;
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -89,26 +96,41 @@ export default function DashboardPage() {
                 <FileCheck2 className="h-4 w-4" />
               </span>
             </div>
-            <CardTitle className="text-3xl capitalize">
-              {latestNoc ? latestNoc.status : "None"}
-            </CardTitle>
+            <CardTitle className="text-3xl">{nocsComplete}/2</CardTitle>
           </CardHeader>
-          <CardContent>
-            {latestNoc ? (
+          <CardContent className="space-y-1.5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">District</span>
               <Badge
                 variant={
-                  latestNoc.status === "approved"
+                  districtNoc?.status === "approved"
                     ? "success"
-                    : latestNoc.status === "rejected"
+                    : districtNoc?.status === "rejected"
                       ? "destructive"
-                      : "warning"
+                      : districtNoc
+                        ? "warning"
+                        : "outline"
                 }
               >
-                {latestNoc.file_name}
+                {districtNoc?.status ?? "not submitted"}
               </Badge>
-            ) : (
-              <p className="text-sm text-muted-foreground">No submission yet</p>
-            )}
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Unit</span>
+              <Badge
+                variant={
+                  unitNoc?.status === "approved"
+                    ? "success"
+                    : unitNoc?.status === "rejected"
+                      ? "destructive"
+                      : unitNoc
+                        ? "warning"
+                        : "outline"
+                }
+              >
+                {unitNoc?.status ?? "not submitted"}
+              </Badge>
+            </div>
             <div>
               <Link
                 href="/noc"

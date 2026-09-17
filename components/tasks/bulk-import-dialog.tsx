@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { bulkImportTasks, type BulkTaskImportResult } from "@/lib/actions/tasks";
+import { downloadExampleCsv } from "@/lib/utils/download-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Upload } from "lucide-react";
+import { Upload, FileDown } from "lucide-react";
 
 const initial: BulkTaskImportResult = { error: null, imported: 0, skipped: [] };
 
@@ -44,6 +45,29 @@ export function BulkImportTasksDialog() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="text-primary"
+              onClick={() =>
+                downloadExampleCsv(
+                  "task-import-example.csv",
+                  ["title", "description", "team_slug", "task_type", "points", "due_date"],
+                  [
+                    "Write a blog post",
+                    "Publish a 500-word post about the recent event.",
+                    "social-media",
+                    "Blog Post",
+                    "10",
+                    "2026-12-31",
+                  ],
+                )
+              }
+            >
+              <FileDown className="mr-1 h-4 w-4" />
+              Download example file
+            </Button>
             <div className="space-y-2">
               <Label htmlFor="task-file">CSV or Excel file</Label>
               <Input

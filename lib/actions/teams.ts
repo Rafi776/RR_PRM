@@ -29,6 +29,7 @@ export async function createTeam(
     name,
     slug: slugify(name),
     description: description || null,
+    organization_id: user.organizationId,
     is_core_team: false,
   });
 
@@ -70,7 +71,7 @@ export async function setTeamLeadership(
   const { error: upsertError } = await supabase
     .from("team_memberships")
     .upsert(
-      { team_id: teamId, member_id: memberId, [column]: true },
+      { team_id: teamId, member_id: memberId, organization_id: user!.organizationId, [column]: true },
       { onConflict: "team_id,member_id" },
     );
   if (upsertError) return { error: upsertError.message };
@@ -95,7 +96,10 @@ export async function addTeamMember(
   const supabase = createClient();
   const { error } = await supabase
     .from("team_memberships")
-    .upsert({ team_id: teamId, member_id: memberId }, { onConflict: "team_id,member_id" });
+    .upsert(
+      { team_id: teamId, member_id: memberId, organization_id: user!.organizationId },
+      { onConflict: "team_id,member_id" },
+    );
   if (error) return { error: error.message };
 
   queryClient.invalidateQueries();
@@ -118,6 +122,7 @@ export async function setCoreRole(
     .from("teams")
     .select("id")
     .eq("is_core_team", true)
+    .eq("organization_id", user.organizationId)
     .single();
   if (!coreTeam) return { error: "Core Team not found." };
 
@@ -125,6 +130,7 @@ export async function setCoreRole(
     {
       team_id: coreTeam.id,
       member_id: memberId,
+      organization_id: user.organizationId,
       core_role: coreRole,
       is_auto_synced: false,
     },
@@ -273,7 +279,11 @@ export async function syncTeamsFromMemberRecords(
 
   const [{ data: existingTeams }, { data: members }] = await Promise.all([
     supabase.from("teams").select("id, name, is_core_team"),
-    supabase.from("prm_members").select("id, team_name").not("team_name", "is", null),
+    supabase
+      .from("prm_members")
+      .select("id, team_name")
+      .eq("organization_id", user.organizationId)
+      .not("team_name", "is", null),
   ]);
 
   const coreNames = new Set(
@@ -297,7 +307,14 @@ export async function syncTeamsFromMemberRecords(
   if (toCreate.length > 0) {
     const { data, error } = await supabase
       .from("teams")
-      .insert(toCreate.map((name) => ({ name, slug: slugify(name), is_core_team: false })))
+      .insert(
+        toCreate.map((name) => ({
+          name,
+          slug: slugify(name),
+          organization_id: user.organizationId,
+          is_core_team: false,
+        })),
+      )
       .select("id, name");
     if (error) return { error: error.message, teamsCreated: [], membersLinked: 0 };
     createdTeams = data ?? [];
@@ -313,9 +330,13 @@ export async function syncTeamsFromMemberRecords(
       const tn = m.team_name?.trim().toLowerCase();
       if (!tn || coreNames.has(tn)) return null;
       const teamId = nameToId.get(tn);
-      return teamId ? { team_id: teamId, member_id: m.id } : null;
+      return teamId
+        ? { team_id: teamId, member_id: m.id, organization_id: user.organizationId }
+        : null;
     })
-    .filter((r): r is { team_id: string; member_id: string } => r !== null);
+    .filter(
+      (r): r is { team_id: string; member_id: string; organization_id: string } => r !== null,
+    );
 
   if (links.length > 0) {
     const { error } = await supabase

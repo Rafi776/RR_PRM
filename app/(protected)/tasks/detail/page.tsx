@@ -61,7 +61,7 @@ function TaskDetailInner() {
   const { task, statuses, comments, attachmentsWithUrl } = detail;
   const canReview =
     user.isSuperAdmin || (task.team_id && user.leadershipTeamIds.includes(task.team_id));
-  const myStatus = statuses.find((s) => s.member_id === user.id);
+  const myStatus = statuses.find((s) => s.member_id === user.memberId);
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">

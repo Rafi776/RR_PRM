@@ -17,7 +17,7 @@ export async function createTaskType(
   const supabase = createClient();
   const { error } = await supabase
     .from("task_types")
-    .insert({ name, default_points: defaultPoints });
+    .insert({ name, default_points: defaultPoints, organization_id: user.organizationId });
   if (error) return { error: error.message };
 
   queryClient.invalidateQueries();

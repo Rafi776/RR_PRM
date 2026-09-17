@@ -35,6 +35,7 @@ export async function createMeeting(
     .insert({
       scope,
       team_id: teamId,
+      organization_id: user.organizationId,
       title,
       meeting_date: meetingDate,
       agenda: agenda || null,
@@ -78,6 +79,7 @@ export async function saveAttendance(
   const rows = memberIds.map((memberId) => ({
     meeting_id: meetingId,
     member_id: memberId,
+    organization_id: user.organizationId,
     status: String(formData.get(`status_${memberId}`) ?? "absent"),
   }));
 

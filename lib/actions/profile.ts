@@ -28,7 +28,7 @@ export async function uploadProfilePhoto(
   }
 
   const supabase = createClient();
-  const path = `${user.id}/${Date.now()}-${file.name}`;
+  const path = `${user.memberId}/${Date.now()}-${file.name}`;
 
   const { error: uploadError } = await supabase.storage
     .from("member-photos")
@@ -42,7 +42,7 @@ export async function uploadProfilePhoto(
   const { error: updateError } = await supabase
     .from("prm_members")
     .update({ photo: publicUrl })
-    .eq("id", user.id);
+    .eq("id", user.memberId);
   if (updateError) return { error: updateError.message };
 
   queryClient.invalidateQueries();
@@ -140,7 +140,7 @@ export async function updateOwnProfile(
       team_name: teamName || null,
       position: position || null,
     })
-    .eq("id", user.id);
+    .eq("id", user.memberId);
   if (error) return { error: error.message };
 
   queryClient.invalidateQueries();

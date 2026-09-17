@@ -1,32 +1,51 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { switchActiveOrganization } from "@/lib/actions/organizations";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, UserCircle } from "lucide-react";
+import { LogOut, UserCircle, Building2, Check } from "lucide-react";
 
 export function UserMenu({
   fullName,
   email,
   avatarUrl,
   roles,
+  organizationId,
+  organizationName,
+  availableOrganizations,
 }: {
   fullName: string;
   email: string;
   avatarUrl: string | null;
   roles: string[];
+  organizationId: string;
+  organizationName: string;
+  availableOrganizations: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
+
+  const handleSwitch = async (orgId: string) => {
+    if (orgId === organizationId) return;
+    setSwitchingId(orgId);
+    const result = await switchActiveOrganization(orgId);
+    setSwitchingId(null);
+    if (result.error) toast.error(result.error);
+  };
   const initials = fullName
     .split(" ")
     .map((p) => p[0])
@@ -62,6 +81,34 @@ export function UserMenu({
             ))
           )}
         </div>
+        <DropdownMenuSeparator />
+        {availableOrganizations.length > 1 ? (
+          <>
+            <DropdownMenuLabel className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
+              <Building2 className="h-3.5 w-3.5" />
+              Organization
+            </DropdownMenuLabel>
+            {availableOrganizations.map((org) => (
+              <DropdownMenuItem
+                key={org.id}
+                disabled={switchingId !== null}
+                onClick={() => handleSwitch(org.id)}
+              >
+                {org.id === organizationId ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <span className="w-4" />
+                )}
+                {switchingId === org.id ? "Switching..." : org.name}
+              </DropdownMenuItem>
+            ))}
+          </>
+        ) : (
+          <div className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground">
+            <Building2 className="h-3.5 w-3.5" />
+            {organizationName}
+          </div>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push("/profile")}>
           <UserCircle className="h-4 w-4" />

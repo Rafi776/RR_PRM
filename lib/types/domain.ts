@@ -1,5 +1,6 @@
 export type MemberStatus = "active" | "inactive";
 export type NocStatus = "pending" | "approved" | "rejected";
+export type NocType = "district" | "unit";
 export type TaskStatus = "not_submitted" | "submitted" | "selected" | "rejected";
 export type MeetingScope = "central_core" | "team";
 export type AttendanceStatus = "present" | "absent" | "excused";
@@ -49,6 +50,7 @@ export type TeamMembership = {
 export type NocSubmission = {
   id: string;
   member_id: string;
+  noc_type: NocType;
   file_path: string;
   file_name: string;
   status: NocStatus;
